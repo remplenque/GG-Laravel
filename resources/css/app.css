@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/* Paleta de Go Gym (Unidades 1 y 2): fondo oscuro y azul de marca. Lo nuevo
+   de la IA va en violeta. */
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+    --color-fondo: #0b1220;
+    --color-tarjeta: #121a2b;
+    --color-tarjeta-alta: #172238;
+    --color-borde: #223049;
+    --color-texto: #e6ebf5;
+    --color-tenue: #8b97ad;
+    --color-primario: #4c8dff;
+    --color-primario-fuerte: #2f6bff;
+    --color-ia: #a78bfa;
+    --color-ia-fondo: #1b1840;
+    --color-ia-borde: #3d3380;
+    --color-error: #f87171;
+    --color-exito: #4ade80;
+}
+
+@layer base {
+    html {
+        color-scheme: dark;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply bg-fondo text-texto font-sans antialiased;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@utility etiqueta {
+    @apply text-[11px] font-bold tracking-[0.12em] uppercase;
+}
+
+/* Portada de rutina: franjas diagonales como el marcador del mockup. */
+@utility franjas {
+    background-color: var(--color-tarjeta);
+    background-image: repeating-linear-gradient(
+        -45deg,
+        color-mix(in oklab, var(--color-borde) 45%, transparent) 0 7px,
+        transparent 7px 16px
+    );
+}
+
+@utility pb-seguro {
+    padding-bottom: env(safe-area-inset-bottom);
+}

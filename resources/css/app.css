@@ -58,3 +58,67 @@
 @utility pb-seguro {
     padding-bottom: env(safe-area-inset-bottom);
 }
+
+
+/* ==========================================================================
+   Animaciones de entrada (Inicio y Rutinas)
+   --------------------------------------------------------------------------
+   Basadas en las de Go Gym en Flutter (Aparecer y Rebote), hechas solo con
+   CSS: corren una vez cada vez que se carga la página. Son cortas y suaves a
+   propósito: acompañan la llegada a la pantalla sin llamar la atención.
+
+   El retraso de cada elemento se da desde el HTML con una variable CSS:
+     style="--i: 2"           → entra en cascada: 2 × 45 ms después del primero.
+     style="--retraso: 200ms" → retraso exacto (cuadritos de la racha).
+
+   "both" en animation deja el elemento con el estado del 0 % mientras espera
+   su turno (invisible) y con el del 100 % al terminar (en su lugar).
+   ========================================================================== */
+
+/* Aparecer: llega desvaneciéndose y subiendo apenas 12 px. La curva es
+   easeOutCubic (rápida al principio, suave al final). */
+@keyframes aparecer {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Crecer: parte al 85 % de su tamaño y llega al 100 %, sin rebote. */
+@keyframes crecer {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@layer components {
+    .aparecer {
+        animation: aparecer 380ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+        /* var(--i, 0): si el elemento no define --i, vale 0 (sin retraso). */
+        animation-delay: calc(var(--i, 0) * 45ms);
+    }
+
+    .crecer {
+        animation: crecer 300ms ease-out both;
+        animation-delay: var(--retraso, 0ms);
+    }
+}
+
+/* Si la persona pidió en su sistema reducir el movimiento, no se anima nada:
+   todo aparece directo en su lugar. Es una cuestión de accesibilidad (a
+   algunas personas el movimiento les marea). */
+@media (prefers-reduced-motion: reduce) {
+    .aparecer,
+    .crecer {
+        animation: none;
+    }
+}

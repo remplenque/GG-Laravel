@@ -22,6 +22,9 @@ class EjercicioSeeder extends Seeder
                 $fila[$columna] = json_encode($fila[$columna], JSON_UNESCAPED_UNICODE);
             }
 
+            // Nombre en minúsculas y sin tildes, para ordenar alfabéticamente.
+            $fila['nombre_orden'] = Ejercicio::normalizar($fila['nombre']);
+
             return $fila;
         }, $filas);
 

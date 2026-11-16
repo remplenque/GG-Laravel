@@ -18,7 +18,6 @@ class VistasPendientesTest extends TestCase
 
         foreach ([
             route('coach'),
-            route('rutinas.generar'),
             route('entrenamientos.index'),
             route('entrenamientos.create'),
         ] as $url) {

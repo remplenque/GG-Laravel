@@ -36,6 +36,14 @@ Route::middleware('auth')->group(function () {
     Route::get('rutinas', [RutinaController::class, 'index'])->name('rutinas.index');
     Route::get('rutinas/generar', [RutinaController::class, 'generar'])->name('rutinas.generar');
 
+    // El formulario "Arma tu rutina" se envía aquí (POST: manda datos). Cada
+    // envío va a gastar una llamada a la IA, así que throttle:5,1 deja máximo
+    // 5 por minuto por usuario; el sexto recibe un 429 "Demasiadas solicitudes".
+    // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
+    Route::post('rutinas/generar', [RutinaController::class, 'proponer'])
+        ->middleware('throttle:5,1')
+        ->name('rutinas.proponer');
+
     // Detalle de una rutina. {rutina} es el id y, como el método recibe
     // "Rutina $rutina", Laravel busca la fila solo (route model binding) y
     // responde 404 si no existe. whereNumber('rutina') acepta solo números:

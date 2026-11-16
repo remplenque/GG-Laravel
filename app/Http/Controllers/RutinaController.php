@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\GenerarRutinaRequest;
 use App\Models\Rutina;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -66,9 +68,34 @@ class RutinaController extends Controller
         ]);
     }
 
-    /** Vista 03 · Generar rutina con IA. Pendiente. */
-    public function generar(): View
+    /**
+     * GET /rutinas/generar (rutinas.generar): vista 03 · formulario "Arma tu rutina".
+     *
+     * Le pasa a la vista las opciones de config/gogym.php y la cuenta, para
+     * precargar el objetivo, el nivel y los días que ya tiene en su perfil.
+     */
+    public function generar(Request $request): View
     {
-        return view('rutinas.generar');
+        return view('rutinas.generar', [
+            'opciones' => config('gogym.rutina_ia'),
+            'user' => $request->user(),
+        ]);
+    }
+
+    /**
+     * POST /rutinas/generar (rutinas.proponer): recibe el formulario.
+     *
+     * Recibir GenerarRutinaRequest en vez de Request hace que Laravel valide
+     * ANTES de entrar aquí: si llega a esta línea, los datos ya son válidos y
+     * $request->validated() trae solo los campos revisados.
+     *
+     * Por ahora vuelve al formulario con lo enviado; en el paso 3 genera la
+     * propuesta, la guarda en la sesión y redirige a la vista 04.
+     */
+    public function proponer(GenerarRutinaRequest $request): RedirectResponse
+    {
+        return redirect()->route('rutinas.generar')
+            ->withInput($request->validated())
+            ->with('estado', 'Formulario válido. La propuesta del coach llega en el paso 3.');
     }
 }

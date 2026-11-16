@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Ejercicio;
+use App\Models\Entrenamiento;
 use App\Models\User;
 use Database\Seeders\EjercicioSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,5 +116,99 @@ class EjercicioTest extends TestCase
         // La página trae 5, y el enlace a la siguiente conserva el grupo.
         $this->assertCount(5, $ejercicios);
         $this->assertStringContainsString('grupo=Pecho', $ejercicios->nextPageUrl());
+    }
+
+    // ===================== Vista 06 · Detalle de ejercicio =====================
+
+    public function test_el_detalle_muestra_la_ficha_y_las_instrucciones(): void
+    {
+        $ejercicio = Ejercicio::findOrFail('bench-press');
+
+        $this->actingAs($this->user)->get(route('ejercicios.show', $ejercicio))
+            ->assertOk()
+            ->assertSee($ejercicio->nombre)
+            ->assertSee($ejercicio->instrucciones[0])
+            ->assertDontSee('En construcción');
+    }
+
+    public function test_sin_historial_las_marcas_quedan_vacias(): void
+    {
+        $respuesta = $this->actingAs($this->user)->get(route('ejercicios.show', 'bench-press'));
+
+        $this->assertNull($respuesta->viewData('ultimaVez'));
+        $this->assertNull($respuesta->viewData('mejorMarca'));
+    }
+
+    public function test_ultima_vez_es_la_mejor_serie_de_la_sesion_mas_reciente(): void
+    {
+        // Hace 7 días levantó más (50 kg), pero la sesión más reciente es la de ayer.
+        $this->sesion($this->user, now()->subDays(7), [[50, 5]]);
+        $this->sesion($this->user, now()->subDay(), [[40, 10], [45, 8]]);
+
+        $ultimaVez = $this->actingAs($this->user)->get(route('ejercicios.show', 'bench-press'))
+            ->viewData('ultimaVez');
+
+        $this->assertSame(45.0, $ultimaVez->kg);
+        $this->assertSame(8, $ultimaVez->reps);
+    }
+
+    public function test_mejor_marca_es_la_serie_con_mas_kg_de_todas(): void
+    {
+        $this->sesion($this->user, now()->subDays(7), [[50, 5], [50, 6]]);
+        $this->sesion($this->user, now()->subDay(), [[45, 8]]);
+
+        $mejor = $this->actingAs($this->user)->get(route('ejercicios.show', 'bench-press'))
+            ->viewData('mejorMarca');
+
+        // Empate en 50 kg: gana la de más repeticiones.
+        $this->assertSame(50.0, $mejor->kg);
+        $this->assertSame(6, $mejor->reps);
+    }
+
+    public function test_no_muestra_marcas_de_otra_cuenta(): void
+    {
+        // Otra persona levantó 100 kg; esta cuenta, 40.
+        $this->sesion(User::factory()->create(), now()->subDay(), [[100, 5]]);
+        $this->sesion($this->user, now()->subDays(3), [[40, 10]]);
+
+        $respuesta = $this->actingAs($this->user)->get(route('ejercicios.show', 'bench-press'));
+
+        $this->assertSame(40.0, $respuesta->viewData('ultimaVez')->kg);
+        $this->assertSame(40.0, $respuesta->viewData('mejorMarca')->kg);
+    }
+
+    public function test_el_detalle_enlaza_al_coach_con_la_pregunta(): void
+    {
+        $ejercicio = Ejercicio::findOrFail('bench-press');
+        $pregunta = '¿Cuál es el error más común en '.mb_strtolower($ejercicio->nombre).'?';
+
+        // e() escapa los & del enlace igual que lo hace Blade en el href.
+        $this->actingAs($this->user)->get(route('ejercicios.show', $ejercicio))
+            ->assertSee(e(route('coach', ['pregunta' => $pregunta])), escape: false);
+    }
+
+    /**
+     * Crea una sesión de $user en $fecha con series de press de banca.
+     *
+     * @param  list<array{0: float|int, 1: int}>  $series  [kg, reps] de cada serie
+     */
+    private function sesion(User $user, $fecha, array $series): Entrenamiento
+    {
+        $entrenamiento = $user->entrenamientos()->create([
+            'nombre' => 'Push',
+            'inicio' => $fecha,
+            'fin' => $fecha->copy()->addHour(),
+        ]);
+
+        foreach ($series as $i => [$kg, $reps]) {
+            $entrenamiento->series()->create([
+                'ejercicio_id' => 'bench-press',
+                'numero' => $i + 1,
+                'kg' => $kg,
+                'reps' => $reps,
+            ]);
+        }
+
+        return $entrenamiento;
     }
 }

@@ -44,6 +44,14 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1')
         ->name('rutinas.proponer');
 
+    // Vista 04 · Rutina generada: la propuesta que quedó en la sesión, y el
+    // botón Regenerar (otra llamada a la IA, por eso también con throttle).
+    // No chocan con rutinas/{rutina} porque ese exige un número (whereNumber).
+    Route::get('rutinas/propuesta', [RutinaController::class, 'propuesta'])->name('rutinas.propuesta');
+    Route::post('rutinas/propuesta/regenerar', [RutinaController::class, 'regenerar'])
+        ->middleware('throttle:5,1')
+        ->name('rutinas.regenerar');
+
     // Detalle de una rutina. {rutina} es el id y, como el método recibe
     // "Rutina $rutina", Laravel busca la fila solo (route model binding) y
     // responde 404 si no existe. whereNumber('rutina') acepta solo números:

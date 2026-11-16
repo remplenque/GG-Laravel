@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\GenerarRutinaRequest;
+use App\Models\Ejercicio;
 use App\Models\Rutina;
+use App\Support\PropuestaRutina;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -18,6 +21,9 @@ use Illuminate\View\View;
  */
 class RutinaController extends Controller
 {
+    /** Llave de la sesión donde vive la propuesta de la IA hasta guardarla. */
+    private const SESION = 'rutina_ia';
+
     /**
      * GET /rutinas (rutinas.index): las rutinas de la cuenta. La que toca
      * según la rotación va destacada y cada una muestra su lugar en la rotación.
@@ -83,19 +89,92 @@ class RutinaController extends Controller
     }
 
     /**
-     * POST /rutinas/generar (rutinas.proponer): recibe el formulario.
+     * POST /rutinas/generar (rutinas.proponer): recibe el formulario y arma
+     * la propuesta.
      *
      * Recibir GenerarRutinaRequest en vez de Request hace que Laravel valide
      * ANTES de entrar aquí: si llega a esta línea, los datos ya son válidos y
      * $request->validated() trae solo los campos revisados.
      *
-     * Por ahora vuelve al formulario con lo enviado; en el paso 3 genera la
-     * propuesta, la guarda en la sesión y redirige a la vista 04.
+     * PropuestaRutina $propuestas lo crea Laravel solo (inyección de
+     * dependencias): basta con pedirlo como parámetro.
      */
-    public function proponer(GenerarRutinaRequest $request): RedirectResponse
+    public function proponer(GenerarRutinaRequest $request, PropuestaRutina $propuestas): RedirectResponse
     {
-        return redirect()->route('rutinas.generar')
-            ->withInput($request->validated())
-            ->with('estado', 'Formulario válido. La propuesta del coach llega en el paso 3.');
+        return $this->armarPropuesta($request->validated(), $propuestas);
+    }
+
+    /**
+     * GET /rutinas/propuesta (rutinas.propuesta): vista 04 · Rutina generada.
+     *
+     * Lee la propuesta de la sesión. Si no hay (se entró directo por la URL o
+     * ya se guardó), vuelve al formulario.
+     */
+    public function propuesta(Request $request): View|RedirectResponse
+    {
+        $datos = $request->session()->get(self::SESION);
+        if ($datos === null) {
+            return redirect()->route('rutinas.generar');
+        }
+
+        // La propuesta solo trae ids: se buscan los ejercicios de una vez
+        // (findMany) y keyBy('id') deja la colección como [id => Ejercicio],
+        // para que la vista los encuentre con $ejercicios[$id].
+        $ids = collect($datos['propuesta']['dias'])->pluck('ejercicios.*.ejercicio_id')->flatten();
+
+        return view('rutinas.propuesta', [
+            'propuesta' => $datos['propuesta'],
+            'preferencias' => $datos['preferencias'],
+            'ejercicios' => Ejercicio::findMany($ids)->keyBy('id'),
+        ]);
+    }
+
+    /**
+     * POST /rutinas/propuesta/regenerar (rutinas.regenerar): otra propuesta
+     * con las mismas preferencias, sin volver a llenar el formulario.
+     */
+    public function regenerar(Request $request, PropuestaRutina $propuestas): RedirectResponse
+    {
+        $datos = $request->session()->get(self::SESION);
+        if ($datos === null) {
+            return redirect()->route('rutinas.generar');
+        }
+
+        return $this->armarPropuesta($datos['preferencias'], $propuestas, $datos['variante'] + 1);
+    }
+
+    /**
+     * Arma, valida y guarda la propuesta en la sesión, y redirige a la vista 04.
+     *
+     * Post/Redirect/Get: el POST nunca muestra una página, siempre redirige a
+     * un GET. Así recargar la vista 04 no vuelve a gastar una llamada a la IA,
+     * y no hacen falta tablas de "borradores": la propuesta vive en la sesión
+     * hasta que se guarda o se descarta.
+     */
+    private function armarPropuesta(array $preferencias, PropuestaRutina $propuestas, int $variante = 0): RedirectResponse
+    {
+        $permitidos = $propuestas->permitidos($preferencias);
+
+        try {
+            $propuesta = $propuestas->validar(
+                $propuestas->generar($preferencias, $permitidos, $variante),
+                $permitidos,
+                (int) $preferencias['dias'],
+            );
+        } catch (ValidationException) {
+            // La propuesta no tiene la forma acordada (con la IA: un ejercicio
+            // inventado, un día de menos…). Se avisa en vez de mostrar algo roto.
+            return redirect()->route('rutinas.generar')
+                ->withInput($preferencias)
+                ->with('error', 'El coach no pudo armar una rutina con esas opciones. Prueba con más equipamiento o vuelve a intentarlo.');
+        }
+
+        session()->put(self::SESION, [
+            'preferencias' => $preferencias,
+            'propuesta' => $propuesta,
+            'variante' => $variante,
+        ]);
+
+        return redirect()->route('rutinas.propuesta');
     }
 }

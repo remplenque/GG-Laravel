@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Ejercicio;
 use App\Models\User;
+use App\Support\PropuestaRutina;
 use Database\Seeders\EjercicioSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -69,12 +72,12 @@ class GenerarRutinaTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/name="equipamiento\[\]" value="Poleas"[^>]*checked/', $html);
     }
 
-    public function test_un_envio_valido_pasa_la_validacion(): void
+    public function test_un_envio_valido_lleva_a_la_propuesta(): void
     {
         $this->actingAs($this->user)
             ->post(route('rutinas.proponer'), $this->datos())
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('rutinas.generar'));
+            ->assertRedirect(route('rutinas.propuesta'));
     }
 
     public function test_los_campos_obligatorios_dan_error(): void
@@ -130,5 +133,121 @@ class GenerarRutinaTest extends TestCase
         }
 
         $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos())->assertStatus(429);
+    }
+
+    // ===================== Paso 3 · Lista permitida =====================
+
+    public function test_permitidos_respeta_el_equipamiento(): void
+    {
+        $permitidos = app(PropuestaRutina::class)->permitidos($this->datos(['equipamiento' => ['Solo peso corporal']]));
+        $equipos = Ejercicio::findMany($permitidos->pluck('id'))->pluck('equipo')->unique();
+
+        $this->assertNotEmpty($permitidos);
+        $this->assertEmpty($equipos->diff(['Sin equipo', 'Barra de dominadas', 'Paralelas']));
+    }
+
+    public function test_permitidos_entiende_los_prefijos_con_asterisco(): void
+    {
+        // 'Máquinas' → 'Máquina*': entran "Máquina Smith", "Máquina de curl femoral"…
+        $permitidos = app(PropuestaRutina::class)->permitidos($this->datos(['equipamiento' => ['Máquinas']]));
+        $equipos = Ejercicio::findMany($permitidos->pluck('id'))->pluck('equipo')->unique();
+
+        $this->assertTrue($equipos->contains('Máquina Smith'));
+        $this->assertTrue($equipos->every(fn ($e) => str_starts_with($e, 'Máquina') || in_array($e, ['Prensa de piernas', 'Pec deck'])));
+    }
+
+    public function test_permitidos_respeta_el_nivel_y_el_tope_por_grupo(): void
+    {
+        $permitidos = app(PropuestaRutina::class)->permitidos($this->datos(['nivel' => 'Principiante']));
+        $ejercicios = Ejercicio::findMany($permitidos->pluck('id'));
+
+        $this->assertSame(['Principiante'], $ejercicios->pluck('nivel')->unique()->values()->all());
+        $this->assertLessThanOrEqual(15, $permitidos->countBy('grupo')->max());
+    }
+
+    // ===================== Paso 3 · Validar la propuesta =====================
+
+    public function test_validar_acepta_la_propuesta_del_generador(): void
+    {
+        $servicio = app(PropuestaRutina::class);
+        $permitidos = $servicio->permitidos($this->datos());
+
+        $propuesta = $servicio->validar($servicio->generar($this->datos(), $permitidos), $permitidos, 4);
+
+        $this->assertCount(4, $propuesta['dias']);
+        $this->assertSame('Torso A', $propuesta['dias'][0]['nombre']);
+    }
+
+    public function test_validar_rechaza_ejercicios_inventados_y_dias_de_mas(): void
+    {
+        $servicio = app(PropuestaRutina::class);
+        $permitidos = $servicio->permitidos($this->datos());
+        $propuesta = $servicio->generar($this->datos(), $permitidos);
+
+        $inventado = $propuesta;
+        $inventado['dias'][0]['ejercicios'][0]['ejercicio_id'] = 'press-en-la-luna';
+
+        $fueraDeRango = $propuesta;
+        $fueraDeRango['dias'][1]['ejercicios'][0]['series'] = 12;
+
+        foreach ([[$inventado, 4], [$fueraDeRango, 4], [$propuesta, 3]] as [$caso, $dias]) {
+            try {
+                $servicio->validar($caso, $permitidos, $dias);
+                $this->fail('validar() debió rechazar la propuesta.');
+            } catch (ValidationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    // ===================== Paso 3 · Vista 04 =====================
+
+    public function test_la_propuesta_muestra_el_plan_y_los_dias(): void
+    {
+        $this->actingAs($this->user)
+            ->followingRedirects()
+            ->post(route('rutinas.proponer'), $this->datos())
+            ->assertOk()
+            ->assertSee('Torso / Pierna · 4 días')
+            ->assertSee('Intermedio · 60 min · Ganar músculo')
+            ->assertSee(['Torso A', 'Pierna A', 'Torso B', 'Pierna B'])
+            ->assertSee('Por qué esta rutina')
+            ->assertSee('RPE 7');
+    }
+
+    public function test_sin_propuesta_en_la_sesion_vuelve_al_formulario(): void
+    {
+        $this->actingAs($this->user)->get(route('rutinas.propuesta'))->assertRedirect(route('rutinas.generar'));
+        $this->actingAs($this->user)->post(route('rutinas.regenerar'))->assertRedirect(route('rutinas.generar'));
+    }
+
+    public function test_regenerar_cambia_los_ejercicios_y_mantiene_las_preferencias(): void
+    {
+        $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos());
+        $antes = session('rutina_ia');
+
+        $this->actingAs($this->user)->post(route('rutinas.regenerar'))->assertRedirect(route('rutinas.propuesta'));
+        $despues = session('rutina_ia');
+
+        $this->assertSame($antes['preferencias'], $despues['preferencias']);
+        $this->assertNotEquals($antes['propuesta']['dias'], $despues['propuesta']['dias']);
+    }
+
+    public function test_una_propuesta_invalida_vuelve_al_formulario_con_aviso(): void
+    {
+        // Simula que el generador (mañana, la IA) inventa un ejercicio:
+        // partialMock reemplaza solo generar(); permitidos() y validar() son los reales.
+        $this->partialMock(PropuestaRutina::class, fn ($mock) => $mock->shouldReceive('generar')->andReturn([
+            'nombre' => 'Inventada',
+            'explicacion' => 'x',
+            'dias' => [['nombre' => 'Día 1', 'ejercicios' => [['ejercicio_id' => 'press-en-la-luna']]]],
+        ]));
+
+        $this->actingAs($this->user)
+            ->followingRedirects()
+            ->post(route('rutinas.proponer'), $this->datos())
+            ->assertSee('El coach no pudo armar una rutina');
+
+        $this->assertNull(session('rutina_ia'));
     }
 }

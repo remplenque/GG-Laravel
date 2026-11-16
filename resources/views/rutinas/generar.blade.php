@@ -30,9 +30,10 @@
     <x-encabezado titulo="Arma tu rutina" etiqueta="Coach IA" :ia="true" :atras="route('rutinas.index')"
                   class="aparecer" style="--i: 0" />
 
-    {{-- Mensaje que deja el controlador con ->with('estado', …). --}}
-    @if (session('estado'))
-        <p class="mt-4 rounded-xl border border-ia-borde bg-ia-fondo px-3 py-2 text-sm">{{ session('estado') }}</p>
+    {{-- Aviso que deja RutinaController con ->with('error', …) si el coach
+         no pudo armar una propuesta válida. --}}
+    @if (session('error'))
+        <p class="mt-4 rounded-xl border border-error/50 bg-error/10 px-3 py-2 text-sm text-error" role="alert">{{ session('error') }}</p>
     @endif
 
     {{-- id="form-rutina": el botón de abajo vive fuera del <form> (en el pie

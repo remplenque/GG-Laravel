@@ -3,7 +3,7 @@
 
       1. Encabezado con cuántos ejercicios se encontraron.
       2. Buscador por nombre.
-      3. Chips para filtrar por grupo muscular.
+      3. Chips para filtrar por grupo muscular, y el acceso a "Explorar en wger".
       4. La lista de ejercicios; cada uno lleva a su detalle (vista 06).
       5. Paginación: anterior / siguiente.
 
@@ -63,6 +63,14 @@
             </a>
         @endforeach
     </nav>
+
+    {{-- ===================== Explorar en wger ===================== --}}
+    {{-- Acceso al catálogo extra de la API de wger (EjercicioController@wger). --}}
+    <x-tarjeta :href="route('ejercicios.wger')" class="aparecer mt-3 flex items-center gap-3 px-3.5 py-3" style="--i: 2">
+        <x-icono nombre="libro" class="text-primario" />
+        <span class="flex-1 text-sm font-semibold">Explorar más en wger</span>
+        <x-icono nombre="flecha-der" class="size-4 text-tenue" />
+    </x-tarjeta>
 
     {{-- ===================== 4. Lista de ejercicios ===================== --}}
     {{-- @forelse recorre los ejercicios de esta página; si no hay, muestra @empty. --}}

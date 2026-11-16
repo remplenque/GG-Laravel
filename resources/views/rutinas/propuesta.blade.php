@@ -92,28 +92,35 @@
 
     {{-- ===================== 6. Botones fijos abajo ===================== --}}
     {{-- Cada botón es su propio <form> POST con @csrf. Regenerar vuelve a
-         pedir una propuesta con las mismas preferencias; Guardar se conecta
-         en el paso 4. --}}
+         pedir una propuesta con las mismas preferencias; Guardar la pasa a
+         "Mis rutinas". La casilla está fuera del <form> de Guardar (va arriba,
+         a lo ancho) y se conecta con él con form="form-guardar". --}}
     <x-slot:pie>
-        <div class="grid grid-cols-[auto_1fr] gap-2" x-data="{ enviando: false }">
-            <form method="POST" action="{{ route('rutinas.regenerar') }}" @submit="enviando = true">
+        <label class="mb-2 flex items-center gap-2 text-xs text-tenue">
+            <input type="checkbox" name="reemplazar" value="1" form="form-guardar"
+                   class="rounded border-borde bg-tarjeta text-primario focus:ring-primario">
+            Reemplazar mis rutinas actuales
+        </label>
+
+        {{-- "enviando" guarda qué botón se apretó (null = ninguno): desactiva los
+             dos para no mandar dos veces, y solo Regenerar cambia su texto. --}}
+        <div class="grid grid-cols-[auto_1fr] gap-2" x-data="{ enviando: null }">
+            <form method="POST" action="{{ route('rutinas.regenerar') }}" @submit="enviando = 'regenerar'">
                 @csrf
                 <button type="submit" x-bind:disabled="enviando"
                         class="flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-borde bg-tarjeta px-4 text-sm font-semibold text-texto hover:bg-white/5 disabled:opacity-60">
                     <x-icono nombre="rayo" class="size-4" />
-                    <span x-text="enviando ? 'Generando…' : 'Regenerar'">Regenerar</span>
+                    <span x-text="enviando === 'regenerar' ? 'Generando…' : 'Regenerar'">Regenerar</span>
                 </button>
             </form>
 
-            @if (Route::has('rutinas.guardar'))
-                <form method="POST" action="{{ route('rutinas.guardar') }}">
-                    @csrf
-                    <button type="submit"
-                            class="flex h-12 w-full items-center justify-center rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario">
-                        Guardar en mis rutinas
-                    </button>
-                </form>
-            @endif
+            <form id="form-guardar" method="POST" action="{{ route('rutinas.guardar') }}" @submit="enviando = 'guardar'">
+                @csrf
+                <button type="submit" x-bind:disabled="enviando"
+                        class="flex h-12 w-full items-center justify-center rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario disabled:opacity-60">
+                    Guardar en mis rutinas
+                </button>
+            </form>
         </div>
         <p class="mt-2 text-center text-[11px] text-tenue">
             Propuesta generada por IA. Ante dolor o lesión, consulta a un profesional.

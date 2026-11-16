@@ -32,9 +32,7 @@
 
     {{-- Aviso que deja RutinaController con ->with('error', …) si el coach
          no pudo armar una propuesta válida. --}}
-    @if (session('error'))
-        <p class="mt-4 rounded-xl border border-error/50 bg-error/10 px-3 py-2 text-sm text-error" role="alert">{{ session('error') }}</p>
-    @endif
+    <x-aviso class="mt-4" />
 
     {{-- id="form-rutina": el botón de abajo vive fuera del <form> (en el pie
          fijo del layout) y se conecta con el atributo form="form-rutina". --}}

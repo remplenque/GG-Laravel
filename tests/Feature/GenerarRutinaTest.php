@@ -250,4 +250,80 @@ class GenerarRutinaTest extends TestCase
 
         $this->assertNull(session('rutina_ia'));
     }
+
+    // ===================== Paso 4 · Guardar =====================
+
+    public function test_guardar_crea_una_rutina_por_dia_en_la_cuenta(): void
+    {
+        $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos());
+        $propuesta = session('rutina_ia')['propuesta'];
+
+        $this->actingAs($this->user)
+            ->post(route('rutinas.guardar'))
+            ->assertRedirect(route('rutinas.index'))
+            ->assertSessionHas('estado', 'Guardamos 4 rutinas en tu rotación.');
+
+        // Una rutina por día, con sus ejercicios en orden y el RPE en "carga".
+        $rutinas = $this->user->rutinas()->with('ejercicios')->get();
+        $this->assertSame(['Torso A', 'Pierna A', 'Torso B', 'Pierna B'], $rutinas->pluck('nombre')->all());
+
+        $primera = $rutinas->first();
+        $this->assertSame('Intermedio', $primera->nivel);
+        $this->assertSame(60, $primera->minutos);
+        $this->assertSame(
+            collect($propuesta['dias'][0]['ejercicios'])->pluck('ejercicio_id')->all(),
+            $primera->ejercicios->pluck('ejercicio_id')->all(),
+        );
+        $this->assertSame('RPE 7', $primera->ejercicios->first()->carga);
+
+        // La propuesta ya no está en la sesión: no se puede guardar dos veces.
+        $this->assertNull(session('rutina_ia'));
+    }
+
+    public function test_las_rutinas_guardadas_entran_a_la_rotacion(): void
+    {
+        $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos());
+        $this->actingAs($this->user)->post(route('rutinas.guardar'));
+
+        // Sin historial, Inicio sugiere la primera rutina guardada.
+        $this->actingAs($this->user)->get(route('inicio'))->assertSee('Torso A');
+    }
+
+    public function test_sin_reemplazar_conserva_las_rutinas_anteriores(): void
+    {
+        $vieja = $this->user->rutinas()->create(['nombre' => 'Mi rutina']);
+
+        $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos());
+        $this->actingAs($this->user)->post(route('rutinas.guardar'));
+
+        $this->assertModelExists($vieja);
+        $this->assertSame(5, $this->user->rutinas()->count());
+    }
+
+    public function test_reemplazar_borra_las_anteriores_pero_no_el_historial(): void
+    {
+        $vieja = $this->user->rutinas()->create(['nombre' => 'Mi rutina']);
+        $sesion = $this->user->entrenamientos()->create([
+            'rutina_id' => $vieja->id,
+            'nombre' => 'Mi rutina',
+            'inicio' => now()->subDay(),
+        ]);
+
+        $this->actingAs($this->user)->post(route('rutinas.proponer'), $this->datos());
+        $this->actingAs($this->user)->post(route('rutinas.guardar'), ['reemplazar' => '1']);
+
+        $this->assertModelMissing($vieja);
+        $this->assertSame(4, $this->user->rutinas()->count());
+        // La sesión sigue, ahora como entrenamiento libre (rutina_id = null).
+        $this->assertNull($sesion->fresh()->rutina_id);
+    }
+
+    public function test_guardar_sin_propuesta_vuelve_al_formulario(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('rutinas.guardar'))
+            ->assertRedirect(route('rutinas.generar'));
+
+        $this->assertSame(0, $this->user->rutinas()->count());
+    }
 }

@@ -105,6 +105,21 @@ class PropuestaRutina
      * $variante cambia qué ejercicios elige, para que "Regenerar" muestre
      * otra opción. Con la IA no hará falta: cada respuesta ya sale distinta.
      *
+     * PASO 5 · Conectar el RutinaAgent (cuando esté laravel/ai): solo cambia
+     * el cuerpo de este método, el resto de la app queda igual.
+     *   1. Armar el texto del prompt con $preferencias (sin nombre ni correo:
+     *      mitigación legal de la propuesta) y la lista $permitidos como
+     *      "id | nombre | grupo", pidiéndole que elija SOLO de esa lista.
+     *   2. $respuesta = RutinaAgent::make()->prompt($texto);
+     *      El agente declara en schema() la misma forma de la propuesta que
+     *      está arriba de esta clase, así que $respuesta['dias'] ya sirve.
+     *   3. Devolver ['nombre' => $respuesta['nombre'], 'explicacion' => …, 'dias' => …].
+     * RutinaController ya valida lo que vuelve y, si no calza, muestra el
+     * aviso en el formulario. Para reintentar una vez antes de rendirse, el
+     * controlador puede llamar dos veces a generar() + validar(). Los errores
+     * de la IA (Laravel\Ai\Exceptions\…, p. ej. RateLimitedException) también
+     * deben terminar en ese aviso, no en un error 500.
+     *
      * @param  Collection<int, Ejercicio>  $permitidos
      */
     public function generar(array $preferencias, Collection $permitidos, int $variante = 0): array

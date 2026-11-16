@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ActualizarRutinaRequest;
 use App\Http\Requests\GenerarRutinaRequest;
 use App\Models\Ejercicio;
 use App\Models\Rutina;
 use App\Support\PropuestaRutina;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * Pestaña "Rutinas": la lista de rutinas de la cuenta y el detalle de cada una.
+ * Pestaña "Rutinas": la lista de rutinas de la cuenta, el detalle de cada una,
+ * el flujo con IA (formulario 03 → propuesta 04 → guardar) y editar/borrar.
  *
  * Como en el resto de la app, el controlador consigue los datos (con los
  * modelos de Eloquent) y elige qué vista mostrar; el HTML vive en
@@ -176,5 +180,166 @@ class RutinaController extends Controller
         ]);
 
         return redirect()->route('rutinas.propuesta');
+    }
+
+    /**
+     * POST /rutinas/propuesta (rutinas.guardar): "Guardar en mis rutinas".
+     *
+     * La propuesta se lee de la SESIÓN, nunca del formulario: así nadie puede
+     * mandar a mano ejercicios que no pasaron por validar(). Del formulario
+     * solo llega la casilla "reemplazar".
+     *
+     * Cada día de la propuesta se guarda como una Rutina ("Torso A",
+     * "Pierna A"…) y cada ejercicio como un RutinaEjercicio. Así entran solas
+     * a la rotación de Rutina::siguiente(): Inicio, Perfil y Registrar las
+     * toman sin cambiar nada.
+     */
+    public function guardar(Request $request): RedirectResponse
+    {
+        $datos = $request->session()->get(self::SESION);
+        if ($datos === null) {
+            return redirect()->route('rutinas.generar');
+        }
+
+        $user = $request->user();
+        $preferencias = $datos['preferencias'];
+        $dias = $datos['propuesta']['dias'];
+
+        // DB::transaction: o se guarda todo, o nada. Si algo falla a mitad de
+        // camino (p. ej. en el tercer día), se deshacen también los dos
+        // primeros y no queda una rutina a medias.
+        DB::transaction(function () use ($request, $user, $preferencias, $dias) {
+            // "Reemplazar mis rutinas actuales": borra las anteriores. El
+            // historial no se pierde: entrenamientos.rutina_id es
+            // nullOnDelete, así que esas sesiones quedan como "libres".
+            if ($request->boolean('reemplazar')) {
+                $user->rutinas()->delete();
+            }
+
+            foreach ($dias as $dia) {
+                // create() desde la relación llena user_id solo.
+                $rutina = $user->rutinas()->create([
+                    'nombre' => $dia['nombre'],
+                    'categoria' => 'Fuerza',
+                    'nivel' => $preferencias['nivel'],
+                    'minutos' => $preferencias['minutos'],
+                ]);
+
+                // createMany() inserta todos los ejercicios del día de una
+                // vez, con rutina_id puesto. El RPE va en "carga" ("RPE 7"):
+                // RutinaEjercicio::resumen ya lo muestra como "4 × 8 · RPE 7".
+                $rutina->ejercicios()->createMany(collect($dia['ejercicios'])->map(fn (array $item, int $orden) => [
+                    'ejercicio_id' => $item['ejercicio_id'],
+                    'orden' => $orden,
+                    'series' => $item['series'],
+                    'repeticiones' => $item['repeticiones'],
+                    'carga' => 'RPE '.$item['rpe'],
+                    'descanso_seg' => $item['descanso_seg'],
+                    'nota' => $item['nota'] ?? null,
+                ])->all());
+            }
+        });
+
+        // Ya se guardó: se borra de la sesión para no guardarla dos veces.
+        $request->session()->forget(self::SESION);
+
+        $cantidad = count($dias);
+
+        return redirect()->route('rutinas.index')
+            ->with('estado', "Guardamos {$cantidad} ".($cantidad === 1 ? 'rutina' : 'rutinas').' en tu rotación.');
+    }
+
+    /**
+     * GET /rutinas/{rutina}/editar (rutinas.editar): formulario para cambiar
+     * el nombre, las series, repeticiones y descanso, o quitar ejercicios.
+     */
+    public function editar(Rutina $rutina): View
+    {
+        Gate::authorize('update', $rutina);
+
+        return view('rutinas.editar', [
+            'rutina' => $rutina->load('ejercicios.ejercicio'),
+        ]);
+    }
+
+    /**
+     * PUT /rutinas/{rutina} (rutinas.actualizar): guarda la edición.
+     *
+     * ActualizarRutinaRequest ya revisó que sea el dueño y que los números
+     * estén en rango. Aquí se recorren los ejercicios de ESTA rutina y se
+     * busca lo que llegó para cada uno por su id: si mandaran el id de un
+     * ejercicio de otra rutina, simplemente no se encuentra y se ignora.
+     */
+    public function actualizar(ActualizarRutinaRequest $request, Rutina $rutina): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        DB::transaction(function () use ($rutina, $datos) {
+            $rutina->update(['nombre' => $datos['nombre']]);
+
+            foreach ($rutina->ejercicios as $item) {
+                $cambios = $datos['ejercicios'][$item->id] ?? null;
+                if ($cambios === null) {
+                    continue;
+                }
+
+                if (! empty($cambios['quitar'])) {
+                    $item->delete();
+                } else {
+                    $item->update([
+                        'series' => $cambios['series'],
+                        'repeticiones' => $cambios['repeticiones'],
+                        'descanso_seg' => $cambios['descanso_seg'],
+                    ]);
+                }
+            }
+        });
+
+        return redirect()->route('rutinas.show', $rutina)->with('estado', 'Guardamos los cambios de la rutina.');
+    }
+
+    /**
+     * DELETE /rutinas/{rutina} (rutinas.eliminar): borra la rutina y sus
+     * ejercicios (cascadeOnDelete en rutina_ejercicios). Los entrenamientos
+     * que salieron de ella se conservan como sesiones libres (nullOnDelete).
+     */
+    public function eliminar(Rutina $rutina): RedirectResponse
+    {
+        Gate::authorize('delete', $rutina);
+
+        $rutina->delete();
+
+        return redirect()->route('rutinas.index')->with('estado', "Borramos {$rutina->nombre}.");
+    }
+
+    /**
+     * POST /ejercicios/{ejercicio}/agregar (ejercicios.agregar): "Agregar a
+     * una rutina" desde el detalle del ejercicio (vista 06).
+     *
+     * La regla exists con where(user_id) hace que solo se acepten rutinas de
+     * ESTA cuenta: el id de una rutina ajena da error de validación, igual
+     * que uno que no existe. Entra al final de la rutina con valores
+     * generales (3 × 10, descanso 90 s), que después se ajustan en Editar.
+     */
+    public function agregarEjercicio(Request $request, Ejercicio $ejercicio): RedirectResponse
+    {
+        $datos = $request->validate([
+            'rutina_id' => ['required', Rule::exists('rutinas', 'id')->where('user_id', $request->user()->id)],
+        ], [], ['rutina_id' => 'rutina']);
+
+        $rutina = $request->user()->rutinas()->findOrFail($datos['rutina_id']);
+
+        $rutina->ejercicios()->create([
+            'ejercicio_id' => $ejercicio->id,
+            // max('orden') + 1: queda después del último. Si la rutina está
+            // vacía, max() da null y (null ?? -1) + 1 = 0.
+            'orden' => ($rutina->ejercicios()->max('orden') ?? -1) + 1,
+            'series' => 3,
+            'repeticiones' => 10,
+            'descanso_seg' => 90,
+        ]);
+
+        return redirect()->route('rutinas.show', $rutina)
+            ->with('estado', "Agregamos {$ejercicio->nombre} a {$rutina->nombre}.");
     }
 }

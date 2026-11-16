@@ -52,6 +52,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1')
         ->name('rutinas.regenerar');
 
+    // "Guardar en mis rutinas": pasa la propuesta de la sesión a la base de datos.
+    Route::post('rutinas/propuesta', [RutinaController::class, 'guardar'])->name('rutinas.guardar');
+
     // Detalle de una rutina. {rutina} es el id y, como el método recibe
     // "Rutina $rutina", Laravel busca la fila solo (route model binding) y
     // responde 404 si no existe. whereNumber('rutina') acepta solo números:
@@ -60,6 +63,19 @@ Route::middleware('auth')->group(function () {
     Route::get('rutinas/{rutina}', [RutinaController::class, 'show'])
         ->whereNumber('rutina')
         ->name('rutinas.show');
+
+    // Editar y borrar una rutina. Los formularios HTML solo mandan GET o
+    // POST: para PUT y DELETE se agrega @method('PUT') o @method('DELETE')
+    // dentro del <form> y Laravel lo trata como ese verbo.
+    Route::get('rutinas/{rutina}/editar', [RutinaController::class, 'editar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.editar');
+    Route::put('rutinas/{rutina}', [RutinaController::class, 'actualizar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.actualizar');
+    Route::delete('rutinas/{rutina}', [RutinaController::class, 'eliminar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.eliminar');
 
     // Registrar entrenamiento (vista 05). Inicio y Rutinas enlazan aquí con
     // ?rutina={id} para abrir el registro con esa rutina precargada.
@@ -73,6 +89,11 @@ Route::middleware('auth')->group(function () {
     // un texto (p. ej. "bench-press"), por eso no lleva whereNumber.
     Route::get('ejercicios', [EjercicioController::class, 'index'])->name('ejercicios.index');
     Route::get('ejercicios/{ejercicio}', [EjercicioController::class, 'show'])->name('ejercicios.show');
+
+    // "Agregar a una rutina" desde el detalle del ejercicio: la rutina elegida
+    // llega en el formulario (rutina_id), por eso no va en la URL.
+    Route::post('ejercicios/{ejercicio}/agregar', [RutinaController::class, 'agregarEjercicio'])
+        ->name('ejercicios.agregar');
 
     Route::get('perfil', PerfilController::class)->name('perfil');
 });

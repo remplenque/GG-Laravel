@@ -22,7 +22,6 @@ class VistasPendientesTest extends TestCase
             route('rutinas.generar'),
             route('entrenamientos.index'),
             route('entrenamientos.create'),
-            route('ejercicios.index'),
             route('ejercicios.show', Ejercicio::firstOrFail()),
         ] as $url) {
             $this->actingAs($user)->get($url)->assertOk()->assertSee('En construcción');

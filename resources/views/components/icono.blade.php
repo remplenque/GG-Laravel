@@ -24,6 +24,7 @@
         'objetivo' => '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
         'balanza' => '<path d="M5 20h14a2 2 0 0 0 2-2V7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v11a2 2 0 0 0 2 2z"/><path d="M8 9a4 4 0 0 1 8 0M12 9l2-2"/>',
         'reloj' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'buscar' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     ];
 @endphp
 

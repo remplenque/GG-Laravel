@@ -41,7 +41,7 @@ Route::middleware('auth')->group(function () {
     // 5 por minuto por usuario; el sexto recibe un 429 "Demasiadas solicitudes".
     // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
     Route::post('rutinas/generar', [RutinaController::class, 'proponer'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:ia-rutinas')
         ->name('rutinas.proponer');
 
     // Vista 04 · Rutina generada: la propuesta que quedó en la sesión, y el
@@ -49,7 +49,7 @@ Route::middleware('auth')->group(function () {
     // No chocan con rutinas/{rutina} porque ese exige un número (whereNumber).
     Route::get('rutinas/propuesta', [RutinaController::class, 'propuesta'])->name('rutinas.propuesta');
     Route::post('rutinas/propuesta/regenerar', [RutinaController::class, 'regenerar'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:ia-rutinas')
         ->name('rutinas.regenerar');
 
     // "Guardar en mis rutinas": pasa la propuesta de la sesión a la base de datos.
@@ -81,6 +81,16 @@ Route::middleware('auth')->group(function () {
     // ?rutina={id} para abrir el registro con esa rutina precargada.
     Route::get('entrenamientos', [EntrenamientoController::class, 'index'])->name('entrenamientos.index');
     Route::get('entrenamientos/registrar', [EntrenamientoController::class, 'create'])->name('entrenamientos.create');
+    Route::post('entrenamientos', [EntrenamientoController::class, 'store'])->name('entrenamientos.store');
+    Route::get('entrenamientos/{entrenamiento}/editar', [EntrenamientoController::class, 'edit'])
+        ->whereNumber('entrenamiento')
+        ->name('entrenamientos.edit');
+    Route::put('entrenamientos/{entrenamiento}', [EntrenamientoController::class, 'update'])
+        ->whereNumber('entrenamiento')
+        ->name('entrenamientos.update');
+    Route::delete('entrenamientos/{entrenamiento}', [EntrenamientoController::class, 'destroy'])
+        ->whereNumber('entrenamiento')
+        ->name('entrenamientos.destroy');
 
     // Vista 02 · Coach IA (chat): ver la conversación, enviar una pregunta y
     // empezar una nueva (borra la actual). Cada pregunta va a gastar una
@@ -88,7 +98,7 @@ Route::middleware('auth')->group(function () {
     // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
     Route::get('coach', [CoachController::class, 'index'])->name('coach');
     Route::post('coach', [CoachController::class, 'preguntar'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:ia')
         ->name('coach.preguntar');
     Route::delete('coach', [CoachController::class, 'nueva'])->name('coach.nueva');
 

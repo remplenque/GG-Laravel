@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\SugerenciaAgent;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,5 +41,19 @@ class InicioTest extends TestCase
             // Tras "Core y cardio" la rotación vuelve a la primera rutina.
             ->assertSee('Push A · Pecho y hombro')
             ->assertSee('Core y cardio');
+    }
+
+    public function test_con_clave_la_sugerencia_del_dia_viene_del_agente(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::where('email', config('gogym.demo.email'))->firstOrFail();
+        config(['ai.providers.groq.key' => 'clave-de-prueba']);
+        SugerenciaAgent::fake(['Mantén la carga de la última sesión y completa todas las repeticiones.']);
+
+        $this->actingAs($user)->get('/')
+            ->assertOk()
+            ->assertSee('Mantén la carga de la última sesión y completa todas las repeticiones.');
+
+        SugerenciaAgent::assertPromptedTimes(1);
     }
 }

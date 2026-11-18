@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\RutinaAgent;
 use App\Models\Ejercicio;
 use App\Models\User;
 use App\Support\PropuestaRutina;
@@ -176,6 +177,21 @@ class GenerarRutinaTest extends TestCase
 
         $this->assertCount(4, $propuesta['dias']);
         $this->assertSame('Torso A', $propuesta['dias'][0]['nombre']);
+    }
+
+    public function test_con_clave_la_propuesta_viene_del_rutina_agent(): void
+    {
+        $servicio = app(PropuestaRutina::class);
+        $permitidos = $servicio->permitidos($this->datos());
+        $esperada = $servicio->generar($this->datos(), $permitidos);
+
+        config(['ai.providers.groq.key' => 'clave-de-prueba']);
+        RutinaAgent::fake([$esperada]);
+
+        $propuesta = $servicio->generar($this->datos(), $permitidos);
+
+        $this->assertSame($esperada, $propuesta);
+        RutinaAgent::assertPromptedTimes(1);
     }
 
     public function test_validar_rechaza_ejercicios_inventados_y_dias_de_mas(): void

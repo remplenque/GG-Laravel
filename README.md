@@ -21,6 +21,17 @@ npm run build               # o `npm run dev` mientras se trabaja en las vistas
 php artisan serve
 ```
 
+Para activar la IA real, agrega al `.env` al menos una clave. Con ambas, Groq
+es el proveedor principal y Gemini queda como respaldo automático:
+
+```dotenv
+GROQ_API_KEY=
+GEMINI_API_KEY=
+```
+
+Sin claves, la app sigue funcionando con las respuestas por reglas para poder
+trabajar localmente y correr las pruebas sin consumir cuota.
+
 Abrir http://localhost:8000 e iniciar sesión con la cuenta demo
 (`GOGYM_DEMO_EMAIL` / `GOGYM_DEMO_PASSWORD` en `.env`). Las sesiones demo son relativas
 al día en que se corre el seeder: `php artisan db:seed --class=DemoSeeder` la deja al día.
@@ -34,14 +45,15 @@ php artisan test
 ```
 app/
 ├── Http/Controllers/
-│   ├── InicioController.php        # 01 · Inicio (hecho; la sugerencia aún es por reglas)
+│   ├── InicioController.php        # 01 · Inicio y sugerencia IA con respaldo local
 │   ├── RutinaController.php        # Rutinas, detalle, 03 · Generar, 04 · Propuesta, guardar y editar (hecho)
-│   ├── CoachController.php         # 02 · Coach IA: chat, preguntar y nueva conversación (hecho; respuestas por reglas)
-│   ├── EntrenamientoController.php # Historial y 05 · Registrar (pendiente)
+│   ├── CoachController.php         # 02 · Coach IA y conversaciones guardadas por cuenta
+│   ├── EntrenamientoController.php # Historial y CRUD de la vista 05
 │   ├── EjercicioController.php     # Biblioteca, 06 · Detalle y Explorar en wger (hecho)
 │   ├── PerfilController.php        # Perfil (hecho)
 │   └── Auth/                       # Laravel Breeze
-├── Http/Requests/                  # GenerarRutinaRequest, ActualizarRutinaRequest
+├── Ai/Agents/                      # CoachAgent, RutinaAgent y SugerenciaAgent
+├── Http/Requests/                  # Validación de rutinas y entrenamientos
 ├── Models/                         # User, Ejercicio, Rutina, RutinaEjercicio, Entrenamiento, EntrenamientoSerie
 ├── Policies/RutinaPolicy.php       # Cada cuenta ve, edita y borra solo sus rutinas
 └── Support/
@@ -61,7 +73,7 @@ resources/views/
 ├── ejercicios/                     # index, show, wger (hechas)
 ├── perfil/                         # show (hecha)
 ├── coach/                          # index (hecha)
-├── entrenamientos/                 # pendiente
+├── entrenamientos/                 # registrar, editar e historial
 └── auth/                           # Breeze, con el diseño de Go Gym
 ```
 
@@ -72,9 +84,9 @@ resources/views/
 cada día pasa a ser una rutina y entra a la rotación de Inicio y Perfil.
 
 `App\Support\PropuestaRutina` arma la lista de ejercicios permitidos (según equipo y
-nivel), genera la propuesta y la valida antes de mostrarla. **Por ahora `generar()` usa
-reglas fijas**: para conectar el `RutinaAgent` de `laravel/ai` basta con cambiar el
-cuerpo de ese método (los pasos están documentados ahí); el resto no cambia.
+nivel), `RutinaAgent` devuelve la propuesta con salida estructurada y Laravel vuelve a
+validarla antes de mostrarla. Si la salida no cumple el contrato se reintenta una vez.
+Sin claves de IA se usa el mismo generador local por reglas.
 
 ## Coach IA
 
@@ -84,14 +96,14 @@ detalle de un ejercicio se llega con `?pregunta=…` y el texto queda escrito en
 Si la pregunta nombra un ejercicio del catálogo, la respuesta trae "Ver ficha".
 
 `App\Support\Coach` tiene las **instrucciones del CoachAgent** (rol, seguridad y
-formato), el contexto que se le manda (solo nivel y objetivo, nunca nombre ni correo) y
-`responder()`. **Por ahora `responder()` usa reglas fijas** (dudas frecuentes + datos del
-catálogo) y la conversación vive en la sesión. Para conectar la IA: cambiar el cuerpo de
-`responder()` (pasos documentados ahí) y, para guardar la conversación por cuenta, los
-métodos `mensajes()` / `guardarMensajes()` de `CoachController`. Si la IA lanza una
-excepción, el controlador ya muestra un aviso en vez de un error 500.
+formato). Solo se envían nivel y objetivo, nunca nombre ni correo. `laravel/ai` guarda
+los mensajes en `agent_conversations` y `agent_conversation_messages`, asociados a la
+cuenta; el botón `+` elimina la conversación activa. Si ambos proveedores fallan, el
+controlador muestra un aviso en vez de un error 500.
 
-Las vistas pendientes muestran `<x-en-construccion>`. Para trabajar una, reemplaza ese
-componente en su archivo de `resources/views` y completa el método de su controlador.
-Los colores de la marca están como tokens en `resources/css/app.css` (`bg-tarjeta`,
-`text-primario`, `text-ia`…).
+## Entrenamientos
+
+`/entrenamientos/registrar` permite elegir una rutina o un ejercicio libre y registrar
+peso, repeticiones y RPE por serie. El historial permite editar y borrar solo las
+sesiones de la cuenta autenticada. Los colores de la marca están como tokens en
+`resources/css/app.css` (`bg-tarjeta`, `text-primario`, `text-ia`…).

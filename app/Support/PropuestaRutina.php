@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Ai\Agents\RutinaAgent;
 use App\Models\Ejercicio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -16,10 +17,8 @@ use Illuminate\Validation\ValidationException;
  *   1. permitidos(): los ejercicios del catálogo que calzan con el equipo y el
  *      nivel elegidos. Es la lista que se le manda a la IA ("elige solo de
  *      aquí") y la que se usa para revisar su respuesta.
- *   2. generar(): arma la propuesta. POR AHORA con reglas fijas, sin IA, para
- *      no esperar a laravel/ai; en el paso 5 adentro va la llamada al
- *      RutinaAgent y nada más cambia (mismo truco que
- *      InicioController::sugerenciaDelDia()).
+ *   2. generar(): pide una salida estructurada al RutinaAgent. Sin claves usa
+ *      el generador por reglas para desarrollo local.
  *   3. validar(): revisa que la propuesta tenga la forma acordada con el
  *      equipo antes de mostrarla o guardarla. Con la IA es indispensable: un
  *      ejercicio_id inventado rompería la llave foránea de rutina_ejercicios.
@@ -100,30 +99,27 @@ class PropuestaRutina
     }
 
     /**
-     * 2 · La propuesta. Por ahora con reglas fijas (generador de prueba).
+     * 2 · La propuesta: RutinaAgent o generador local de respaldo.
      *
-     * $variante cambia qué ejercicios elige, para que "Regenerar" muestre
-     * otra opción. Con la IA no hará falta: cada respuesta ya sale distinta.
-     *
-     * PASO 5 · Conectar el RutinaAgent (cuando esté laravel/ai): solo cambia
-     * el cuerpo de este método, el resto de la app queda igual.
-     *   1. Armar el texto del prompt con $preferencias (sin nombre ni correo:
-     *      mitigación legal de la propuesta) y la lista $permitidos como
-     *      "id | nombre | grupo", pidiéndole que elija SOLO de esa lista.
-     *   2. $respuesta = RutinaAgent::make()->prompt($texto);
-     *      El agente declara en schema() la misma forma de la propuesta que
-     *      está arriba de esta clase, así que $respuesta['dias'] ya sirve.
-     *   3. Devolver ['nombre' => $respuesta['nombre'], 'explicacion' => …, 'dias' => …].
-     * RutinaController ya valida lo que vuelve y, si no calza, muestra el
-     * aviso en el formulario. Para reintentar una vez antes de rendirse, el
-     * controlador puede llamar dos veces a generar() + validar(). Los errores
-     * de la IA (Laravel\Ai\Exceptions\…, p. ej. RateLimitedException) también
-     * deben terminar en ese aviso, no en un error 500.
+     * $variante cambia qué ejercicios elige en el respaldo y pide diversidad
+     * al agente cuando la persona pulsa "Regenerar". El prompt es anónimo y el
+     * controlador valida el resultado, reintenta una vez y maneja los errores.
      *
      * @param  Collection<int, Ejercicio>  $permitidos
      */
     public function generar(array $preferencias, Collection $permitidos, int $variante = 0): array
     {
+        $proveedores = app(ProveedoresIa::class);
+
+        if ($proveedores->configurada()) {
+            $respuesta = (new RutinaAgent)->prompt(
+                $this->prompt($preferencias, $permitidos, $variante),
+                provider: $proveedores->disponibles(),
+            );
+
+            return $respuesta->toArray();
+        }
+
         $porGrupo = $permitidos->groupBy('grupo');
         [$nombre, $dias, $explicacion] = $this->division($preferencias['dias']);
 
@@ -171,6 +167,42 @@ class PropuestaRutina
         }
 
         return $propuesta;
+    }
+
+    /**
+     * Prompt anónimo: no incluye nombre, correo ni identificadores de cuenta.
+     *
+     * @param  Collection<int, Ejercicio>  $permitidos
+     */
+    private function prompt(array $preferencias, Collection $permitidos, int $variante): string
+    {
+        $molestias = filled($preferencias['molestias'] ?? null)
+            ? $preferencias['molestias']
+            : 'Ninguna informada';
+        $equipamiento = $this->lista($preferencias['equipamiento']);
+        $catalogo = $permitidos
+            ->map(fn (Ejercicio $ejercicio) => "{$ejercicio->id} | {$ejercicio->nombre} | {$ejercicio->grupo}")
+            ->implode("\n");
+
+        return <<<TEXTO
+            Genera una propuesta distinta (variante {$variante}) con estos datos:
+            - Objetivo: {$preferencias['objetivo']}
+            - Nivel: {$preferencias['nivel']}
+            - Días por semana: {$preferencias['dias']}
+            - Minutos por sesión: {$preferencias['minutos']}
+            - Equipamiento: {$equipamiento}
+            - Molestias o preferencias: {$molestias}
+
+            Cada día debe tener entre 3 y 10 ejercicios. Ajusta series, repeticiones, descanso y RPE al objetivo y al tiempo.
+            Usa SOLO identificadores de esta lista permitida:
+            {$catalogo}
+            TEXTO;
+    }
+
+    /** @param list<string> $valores */
+    private function lista(array $valores): string
+    {
+        return implode(', ', $valores);
     }
 
     /**

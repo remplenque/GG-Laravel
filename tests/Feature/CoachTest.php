@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\CoachAgent;
 use App\Models\User;
 use App\Support\Coach;
 use Database\Seeders\EjercicioSeeder;
@@ -158,5 +159,25 @@ class CoachTest extends TestCase
         $this->assertStringContainsString('Ganar músculo', $contexto);
         $this->assertStringNotContainsString('Vicente', $contexto);
         $this->assertStringNotContainsString('vicente@gogym.app', $contexto);
+    }
+
+    public function test_con_clave_usa_el_agente_y_guarda_la_conversacion_en_la_cuenta(): void
+    {
+        config(['ai.providers.groq.key' => 'clave-de-prueba']);
+        CoachAgent::fake(['Respuesta generada por **IA**.']);
+
+        $this->actingAs($this->user)
+            ->post(route('coach.preguntar'), ['pregunta' => '¿Cuándo subo el peso?'])
+            ->assertRedirect(route('coach'));
+
+        $this->assertIsString(session('coach.conversacion_id'));
+        $this->assertDatabaseCount('agent_conversations', 1);
+        $this->assertDatabaseCount('agent_conversation_messages', 2);
+        $this->actingAs($this->user)->get(route('coach'))
+            ->assertSee('Respuesta generada por <strong>IA</strong>.', false);
+
+        $this->actingAs($this->user)->delete(route('coach.nueva'));
+        $this->assertDatabaseCount('agent_conversations', 0);
+        $this->assertDatabaseCount('agent_conversation_messages', 0);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Rutina;
 use App\Models\User;
 use App\Support\Formato;
 use App\Support\Historial;
+use App\Support\SugerenciaDia;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ use Illuminate\View\View;
  */
 class InicioController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, SugerenciaDia $ia): View
     {
         // $request->user() es el usuario con sesión (la ruta exige 'auth').
         $user = $request->user();
@@ -52,6 +53,17 @@ class InicioController extends Controller
         // La rutina que toca según la rotación (la que sigue a la última hecha).
         $rutinas = $user->rutinas()->with('ejercicios.ejercicio')->get();
         $siguiente = Rutina::siguiente($rutinas, $entrenamientos);
+        $sugerencia = null;
+        if ($siguiente) {
+            $respaldo = $this->sugerenciaDelDia(
+                $user,
+                $siguiente,
+                $entrenamientos,
+                $historial->entrenoEl($hoy),
+                $hoy,
+            );
+            $sugerencia = $ia->generar($user, $siguiente, $entrenamientos, $respaldo);
+        }
 
         // Todo lo que va dentro de este arreglo llega a la vista como variable:
         // la llave 'racha' se lee en Blade como $racha, 'ultimas' como $ultimas…
@@ -77,9 +89,7 @@ class InicioController extends Controller
             ],
             'siguiente' => $siguiente,
             // Texto de la tarjeta violeta "Coach IA · Sugerencia de hoy".
-            'sugerencia' => $siguiente
-                ? $this->sugerenciaDelDia($user, $siguiente, $entrenamientos, $historial->entrenoEl($hoy), $hoy)
-                : null,
+            'sugerencia' => $sugerencia,
             'ultimas' => $ultimas,
         ]);
     }
@@ -87,12 +97,9 @@ class InicioController extends Controller
     /**
      * Sugerencia del día para la tarjeta del Coach IA.
      *
-     * Por ahora se arma con reglas a partir del historial, sin llamar a la IA:
-     * qué rutina toca y, si en la última vez subió la carga de algún ejercicio,
-     * un consejo para consolidarla. Cuando se integre la IA (semana 3, modelo
-     * llama-3.1-8b-instant de Groq) basta con reemplazar el texto que devuelve
-     * este método por la respuesta del agente: la vista no cambia, porque solo
-     * recibe un string en $sugerencia.
+     * Este método arma el respaldo por reglas. SugerenciaDia se lo entrega al
+     * agente junto con el historial anónimo y lo usa si no hay claves o si los
+     * proveedores de IA fallan.
      *
      * @param  Collection<int, Entrenamiento>  $entrenamientos  más recientes primero
      */

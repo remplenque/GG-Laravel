@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Ai\Agents\CoachAgent;
 use App\Models\Ejercicio;
 use App\Support\Coach;
+use App\Support\ProveedoresIa;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Laravel\Ai\Models\Conversation;
+use Laravel\Ai\Models\ConversationMessage;
 use Throwable;
 
 /**
@@ -22,6 +27,10 @@ class CoachController extends Controller
 {
     /** Clave de la sesión con la conversación. */
     private const SESION = 'coach.mensajes';
+
+    private const CONVERSACION = 'coach.conversacion_id';
+
+    private const CONVERSACION_VACIA = 'coach.conversacion_vacia';
 
     /** Tope de mensajes guardados: la sesión no crece sin fin. */
     private const MAX_MENSAJES = 40;
@@ -65,6 +74,7 @@ class CoachController extends Controller
                 array_slice($mensajes, -Coach::MAX_HISTORIAL),
                 $pregunta,
                 $ejercicio,
+                $this->idConversacion($request),
             );
         } catch (Throwable $error) {
             // Cuota agotada, proveedor caído, respuesta vacía… Se registra en
@@ -76,9 +86,14 @@ class CoachController extends Controller
                 ->with('error', 'El coach no pudo responder ahora. Espera un momento y vuelve a intentarlo.');
         }
 
-        $mensajes[] = ['rol' => 'usuario', 'texto' => $pregunta, 'ejercicio_id' => null];
-        $mensajes[] = ['rol' => 'coach', 'texto' => $respuesta, 'ejercicio_id' => $ejercicio?->id];
-        $this->guardarMensajes($request, $mensajes);
+        if ($coach->ultimaConversacionId() !== null) {
+            $request->session()->put(self::CONVERSACION, $coach->ultimaConversacionId());
+            $request->session()->forget([self::CONVERSACION_VACIA, self::SESION]);
+        } else {
+            $mensajes[] = ['rol' => 'usuario', 'texto' => $pregunta, 'ejercicio_id' => null];
+            $mensajes[] = ['rol' => 'coach', 'texto' => $respuesta, 'ejercicio_id' => $ejercicio?->id];
+            $this->guardarMensajes($request, $mensajes);
+        }
 
         return redirect()->route('coach');
     }
@@ -89,7 +104,21 @@ class CoachController extends Controller
      */
     public function nueva(Request $request): RedirectResponse
     {
-        $request->session()->forget(self::SESION);
+        $id = $this->idConversacion($request);
+        if ($id !== null) {
+            DB::transaction(function () use ($id, $request): void {
+                $conversacion = $this->conversacionDe($request, $id);
+                if ($conversacion === null) {
+                    return;
+                }
+
+                $conversacion->messages()->delete();
+                $conversacion->delete();
+            });
+        }
+
+        $request->session()->forget([self::SESION, self::CONVERSACION]);
+        $request->session()->put(self::CONVERSACION_VACIA, true);
 
         return redirect()->route('coach');
     }
@@ -104,7 +133,75 @@ class CoachController extends Controller
      */
     private function mensajes(Request $request): array
     {
+        $id = $this->idConversacion($request);
+        $conversacion = $id === null ? null : $this->conversacionDe($request, $id);
+
+        if ($conversacion !== null) {
+            $ejercicioActual = null;
+            $coach = app(Coach::class);
+
+            return $conversacion->messages()
+                ->where('agent', CoachAgent::class)
+                ->oldest()
+                ->get(['role', 'content'])
+                ->map(function (ConversationMessage $mensaje) use ($coach, &$ejercicioActual): array {
+                    if ($mensaje->role === 'user') {
+                        $ejercicioActual = $coach->ejercicioMencionado($mensaje->content)?->id;
+
+                        return ['rol' => 'usuario', 'texto' => $mensaje->content, 'ejercicio_id' => null];
+                    }
+
+                    $resultado = [
+                        'rol' => 'coach',
+                        'texto' => $mensaje->content,
+                        'ejercicio_id' => $ejercicioActual,
+                    ];
+                    $ejercicioActual = null;
+
+                    return $resultado;
+                })
+                ->values()
+                ->all();
+        }
+
         return $request->session()->get(self::SESION, []);
+    }
+
+    private function idConversacion(Request $request): ?string
+    {
+        $id = $request->session()->get(self::CONVERSACION);
+        if (is_string($id) || $request->session()->get(self::CONVERSACION_VACIA) === true) {
+            return $id;
+        }
+
+        if (! app(ProveedoresIa::class)->configurada()) {
+            return null;
+        }
+
+        $user = $request->user();
+        $id = Conversation::query()
+            ->where('participant_type', Conversation::participantType($user))
+            ->where('participant_id', Conversation::participantKey($user))
+            ->whereHas('messages', fn ($consulta) => $consulta->where('agent', CoachAgent::class))
+            ->latest('updated_at')
+            ->value('id');
+
+        if (is_string($id)) {
+            $request->session()->put(self::CONVERSACION, $id);
+        }
+
+        return $id;
+    }
+
+    private function conversacionDe(Request $request, string $id): ?Conversation
+    {
+        $user = $request->user();
+
+        return Conversation::query()
+            ->whereKey($id)
+            ->where('participant_type', Conversation::participantType($user))
+            ->where('participant_id', Conversation::participantKey($user))
+            ->first();
     }
 
     /**

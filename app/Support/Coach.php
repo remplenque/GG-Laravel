@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Ai\Agents\CoachAgent;
 use App\Models\Ejercicio;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -11,10 +12,8 @@ use Illuminate\Support\Str;
  * Coach IA (vista 02): las instrucciones del agente, el contexto que se le
  * manda y la respuesta a cada pregunta.
  *
- * Mismo truco que PropuestaRutina::generar(): POR AHORA responder() contesta
- * con reglas fijas (dudas frecuentes + datos del catálogo), para que la
- * pantalla funcione sin esperar a laravel/ai. Al conectar el CoachAgent solo
- * cambia el cuerpo de responder(); CoachController y la vista quedan igual.
+ * responder() usa CoachAgent con Groq y Gemini cuando hay una clave. Sin
+ * claves conserva respuestas por reglas para el desarrollo local.
  *
  * Cada mensaje de la conversación es un arreglo con esta forma:
  *
@@ -27,6 +26,8 @@ use Illuminate\Support\Str;
  */
 class Coach
 {
+    private ?string $ultimaConversacionId = null;
+
     /**
      * Cuántos mensajes anteriores se le mandan a la IA junto con la pregunta.
      * Mitigación de la propuesta: "enviar solo los últimos mensajes" para no
@@ -120,31 +121,33 @@ class Coach
     }
 
     /**
-     * La respuesta del coach, en Markdown. Por ahora con reglas fijas.
-     *
-     * PASO · Conectar el CoachAgent (Ian, cuando esté laravel/ai): solo cambia
-     * el cuerpo de este método.
-     *   1. php artisan make:agent CoachAgent. Que use Promptable y
-     *      RemembersConversations; instructions() devuelve
-     *      $this->instrucciones()."\n\n".$this->contexto($user) (recibir el
-     *      User en el constructor). maxConversationMessages() devuelve
-     *      self::MAX_HISTORIAL. Proveedor: Groq con Gemini de respaldo.
-     *   2. $respuesta = (new CoachAgent($user))
-     *          ->continueOrStart($conversacionId, as: $user)
-     *          ->prompt($pregunta);
-     *      RemembersConversations guarda la pregunta y la respuesta en las
-     *      tablas de conversaciones de laravel/ai, y manda los últimos
-     *      mensajes solo: $historial deja de hacer falta aquí.
-     *   3. Guardar $respuesta->conversationId (en la sesión basta) y
-     *      return (string) $respuesta;
-     * Si la IA falla (Laravel\Ai\Exceptions\…, p. ej. RateLimitedException),
-     * basta con dejar pasar la excepción: CoachController ya la convierte en
-     * el aviso rojo de la vista, sin error 500.
+     * La respuesta del coach, en Markdown. CoachAgent guarda la conversación
+     * por cuenta; el arreglo $historial solo lo usa el respaldo local.
      *
      * @param  list<array{rol: string, texto: string, ejercicio_id: ?string}>  $historial  mensajes anteriores (sin la pregunta)
      */
-    public function responder(User $user, array $historial, string $pregunta, ?Ejercicio $ejercicio = null): string
-    {
+    public function responder(
+        User $user,
+        array $historial,
+        string $pregunta,
+        ?Ejercicio $ejercicio = null,
+        ?string $conversacionId = null,
+    ): string {
+        $proveedores = app(ProveedoresIa::class);
+
+        if ($proveedores->configurada()) {
+            $respuesta = CoachAgent::make(user: $user)
+                ->continueOrStart($conversacionId, as: $user)
+                ->prompt($pregunta, provider: $proveedores->disponibles());
+
+            $this->ultimaConversacionId = $respuesta->conversationId;
+
+            return trim((string) $respuesta);
+        }
+
+        // Sin claves locales se conserva el generador por reglas. Así la app
+        // sigue siendo demostrable, pero en cuanto existe una clave la ruta
+        // anterior usa el agente real y guarda la conversación por cuenta.
         $texto = Ejercicio::normalizar($pregunta);
         $tiene = fn (string $patron) => preg_match("/{$patron}/u", $texto) === 1;
 
@@ -164,6 +167,11 @@ class Coach
             $ejercicio !== null => "Revisa la ficha de **{$ejercicio->nombre}**: tiene los pasos, los músculos que trabaja y consejos de técnica. Si tienes una duda puntual, pregúntame el paso que no te queda claro.",
             default => $this->fueraDeLoConocido(),
         };
+    }
+
+    public function ultimaConversacionId(): ?string
+    {
+        return $this->ultimaConversacionId;
     }
 
     private function anteDolor(): string

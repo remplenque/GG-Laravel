@@ -167,8 +167,8 @@
         {{-- @if / @else: si hay una rutina que toca, se sugiere esa; si la
              cuenta aún no tiene rutinas, se invita a crear la primera. --}}
         @if ($siguiente)
-            {{-- $sugerencia es un string que arma InicioController. Cuando se
-                 conecte la IA, el texto cambiará y esta línea seguirá igual. --}}
+            {{-- $sugerencia viene del agente; ante una falla conserva el texto
+                 seguro por reglas que arma InicioController. --}}
             <p class="mt-2.5 text-sm leading-relaxed">{{ $sugerencia }}</p>
 
             <div class="mt-4 flex flex-wrap gap-2">

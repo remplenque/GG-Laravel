@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Throwable;
 
 /**
  * Pestaña "Rutinas": la lista de rutinas de la cuenta, el detalle de cada una,
@@ -160,12 +161,24 @@ class RutinaController extends Controller
         $permitidos = $propuestas->permitidos($preferencias);
 
         try {
-            $propuesta = $propuestas->validar(
-                $propuestas->generar($preferencias, $permitidos, $variante),
-                $permitidos,
-                (int) $preferencias['dias'],
-            );
-        } catch (ValidationException) {
+            $propuesta = null;
+            for ($intento = 0; $intento < 2; $intento++) {
+                try {
+                    $propuesta = $propuestas->validar(
+                        $propuestas->generar($preferencias, $permitidos, $variante + $intento),
+                        $permitidos,
+                        (int) $preferencias['dias'],
+                    );
+                    break;
+                } catch (ValidationException $error) {
+                    if ($intento === 1) {
+                        throw $error;
+                    }
+                }
+            }
+        } catch (Throwable $error) {
+            report($error);
+
             // La propuesta no tiene la forma acordada (con la IA: un ejercicio
             // inventado, un día de menos…). Se avisa en vez de mostrar algo roto.
             return redirect()->route('rutinas.generar')

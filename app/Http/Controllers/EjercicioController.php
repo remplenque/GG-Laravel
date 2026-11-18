@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ejercicio;
+use App\Models\EntrenamientoSerie;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -29,7 +30,7 @@ class EjercicioController extends Controller
             // Busca en nombre_orden (sin tildes ni mayúsculas) y normaliza también
             // lo escrito, así "biceps", "Bíceps" y "BICEPS" encuentran lo mismo.
             ->when($request->query('q'), fn ($consulta, $texto) => $consulta->where('nombre_orden', 'like', '%'.Ejercicio::normalizar($texto).'%'))
-            // Si viene ?grupo=, deja solo los de ese grupo muscular (Pecho, Espalda…). 
+            // Si viene ?grupo=, deja solo los de ese grupo muscular (Pecho, Espalda…).
             // Osea que si el usuario hace click en un chip de filtro, se queda solo con ese grupo.
             ->when($request->query('grupo'), fn ($consulta, $grupo) => $consulta->where('grupo', $grupo))
             // Ordena de la A a la Z sin importar mayúsculas ni tildes: usa
@@ -57,9 +58,56 @@ class EjercicioController extends Controller
         ]);
     }
 
-    /** Vista 06 · Detalle de ejercicio. Pendiente. */
-    public function show(Ejercicio $ejercicio): View
+    /**
+     * GET /ejercicios/{ejercicio} (ejercicios.show): vista 06 · Detalle de ejercicio.
+     *
+     * Además de la ficha del catálogo, muestra dos marcas del usuario con
+     * sesión en este ejercicio. Las dos son una EntrenamientoSerie (o null si
+     * nunca lo ha hecho), así la vista lee ->kg y ->reps de la misma forma:
+     *   - Última vez: la mejor serie de su sesión más reciente con este ejercicio.
+     *   - Mejor marca: su serie con más kg de todas (si empatan, la de más reps).
+     */
+    public function show(Request $request, Ejercicio $ejercicio): View
     {
-        return view('ejercicios.show', ['ejercicio' => $ejercicio]);
+        $user = $request->user();
+
+        // La sesión más reciente en que hizo este ejercicio. entrenamientos()
+        // ya viene de la más nueva a la más antigua (latest('inicio') en User);
+        // whereHas deja solo las que tienen alguna serie de este ejercicio.
+        // Queda en null si nunca lo ha hecho.
+        $ultimaSesion = $user->entrenamientos()
+            ->whereHas('series', fn ($consulta) => $consulta->where('ejercicio_id', $ejercicio->id))
+            ->first();
+
+        // Su mejor serie de este ejercicio en esa sesión. reorder() borra el
+        // orden por 'orden' y 'numero' que trae la relación series(), para
+        // ordenar por kg y, si empatan, por reps.
+        if ($ultimaSesion) {
+            $ultimaVez = $ultimaSesion->series()
+                ->where('ejercicio_id', $ejercicio->id)
+                ->reorder()
+                ->orderByDesc('kg')
+                ->orderByDesc('reps')
+                ->first();
+        } else {
+            $ultimaVez = null;
+        }
+
+        // Su mejor marca: la serie con más kg entre TODAS sus sesiones. Las
+        // series no tienen user_id, por eso whereHas('entrenamiento') filtra
+        // por el dueño de la sesión; sin él aparecerían las marcas de otras
+        // cuentas (lo revisa test_no_muestra_marcas_de_otra_cuenta).
+        $mejorMarca = EntrenamientoSerie::query()
+            ->where('ejercicio_id', $ejercicio->id)
+            ->whereHas('entrenamiento', fn ($consulta) => $consulta->where('user_id', $user->id))
+            ->orderByDesc('kg')
+            ->orderByDesc('reps')
+            ->first();
+
+        return view('ejercicios.show', [
+            'ejercicio' => $ejercicio,
+            'ultimaVez' => $ultimaVez,
+            'mejorMarca' => $mejorMarca,
+        ]);
     }
 }

@@ -51,6 +51,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Explorar en wger
+    |--------------------------------------------------------------------------
+    |
+    | La sección "Explorar en wger" de la biblioteca lee la API pública de
+    | wger (no pide clave), la misma que usaba la versión Flutter. Cada
+    | ejercicio trae todas sus traducciones y pesa ~12 KB, así que se pide una
+    | sola página y se guarda en caché para no repetir la llamada en cada visita.
+    |
+    */
+
+    'wger' => [
+        'url' => env('GOGYM_WGER_URL', 'https://wger.de/api/v2'),
+        'limite' => 60,
+        'cache_horas' => 24,
+        'timeout_segundos' => 15,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Generar rutina con IA (vista 03)
     |--------------------------------------------------------------------------
     |

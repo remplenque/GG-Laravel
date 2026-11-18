@@ -88,6 +88,12 @@ Route::middleware('auth')->group(function () {
     // Biblioteca de ejercicios y su detalle (vista 06). Aquí {ejercicio} es
     // un texto (p. ej. "bench-press"), por eso no lleva whereNumber.
     Route::get('ejercicios', [EjercicioController::class, 'index'])->name('ejercicios.index');
+
+    // "Explorar en wger" (API externa). Va ANTES de ejercicios/{ejercicio}:
+    // como ese acepta cualquier texto, si estuviera primero tomaría "wger"
+    // como el id de un ejercicio y respondería 404.
+    Route::get('ejercicios/wger', [EjercicioController::class, 'wger'])->name('ejercicios.wger');
+
     Route::get('ejercicios/{ejercicio}', [EjercicioController::class, 'show'])->name('ejercicios.show');
 
     // "Agregar a una rutina" desde el detalle del ejercicio: la rutina elegida

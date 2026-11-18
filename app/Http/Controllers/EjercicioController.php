@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Ejercicio;
 use App\Models\EntrenamientoSerie;
+use App\Support\Wger;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
  * Biblioteca de ejercicios: el catálogo RepDB (601 ejercicios) y el detalle
  * de cada uno. El catálogo vive en la tabla `ejercicios` (lo carga
- * EjercicioSeeder desde database/data/ejercicios.json), así que no se llama a
- * ninguna API externa.
+ * EjercicioSeeder desde database/data/ejercicios.json). Aparte, la sección
+ * "Explorar en wger" lee la API pública de wger (App\Support\Wger).
  */
 class EjercicioController extends Controller
 {
@@ -55,6 +58,37 @@ class EjercicioController extends Controller
             'q' => $request->query('q'),
             // El grupo elegido, para marcar su chip como activo.
             'grupo' => $request->query('grupo'),
+        ]);
+    }
+
+    /**
+     * GET /ejercicios/wger (ejercicios.wger): "Explorar en wger".
+     *
+     * Wger $wger lo crea Laravel solo (inyección de dependencias). Si la API
+     * no responde o responde con error, la vista muestra un aviso en vez de
+     * caerse: la biblioteca principal (RepDB) sigue funcionando igual.
+     * report() deja el error en storage/logs para poder revisarlo.
+     */
+    public function wger(Request $request, Wger $wger): View
+    {
+        try {
+            $ejercicios = $wger->ejercicios();
+            $error = false;
+        } catch (ConnectionException|RequestException $e) {
+            report($e);
+            $ejercicios = collect();
+            $error = true;
+        }
+
+        // ?categoria=Pecho filtra por categoría, como los chips de la biblioteca.
+        $categoria = $request->query('categoria');
+
+        return view('ejercicios.wger', [
+            'ejercicios' => $categoria ? $ejercicios->where('categoria', $categoria)->values() : $ejercicios,
+            // Las categorías que vinieron, sin repetir y en orden, para los chips.
+            'categorias' => $ejercicios->pluck('categoria')->filter()->unique()->sort()->values(),
+            'categoria' => $categoria,
+            'error' => $error,
         ]);
     }
 
@@ -108,6 +142,8 @@ class EjercicioController extends Controller
             'ejercicio' => $ejercicio,
             'ultimaVez' => $ultimaVez,
             'mejorMarca' => $mejorMarca,
+            // Para el selector "Agregar a una rutina": solo id y nombre.
+            'rutinas' => $user->rutinas()->get(['id', 'nombre']),
         ]);
     }
 }

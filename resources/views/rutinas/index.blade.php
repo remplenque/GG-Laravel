@@ -29,6 +29,9 @@
         <h1 class="font-display text-2xl font-bold">Rutinas</h1>
     </header>
 
+    {{-- "Guardamos 4 rutinas…" o "Borramos Push A." (RutinaController). --}}
+    <x-aviso class="mt-4" />
+
     {{-- ===================== 2. Armar con el Coach IA ===================== --}}
     {{-- Solo si ya hay rutinas: con la lista vacía, el mismo llamado aparece
          más grande en el estado vacío de abajo. --}}

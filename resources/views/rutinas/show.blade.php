@@ -40,7 +40,16 @@
                 <x-icono nombre="lista" class="size-3.5 text-primario" />
                 {{ collect(['Rutina', $rutina->categoria ?: null, $rutina->nivel ?: null])->filter()->join(' · ') }}
             </span>
+
+            {{-- ml-auto empuja "Editar" al borde derecho. --}}
+            <a href="{{ route('rutinas.editar', $rutina) }}"
+               class="ml-auto rounded-[10px] border border-borde bg-tarjeta px-3 py-1.5 text-xs font-semibold text-texto hover:border-primario/60">
+                Editar
+            </a>
         </div>
+
+        {{-- "Guardamos los cambios…" o "Agregamos … a …" (RutinaController). --}}
+        <x-aviso class="aparecer mt-4" style="--i: 0" />
 
         {{-- ===================== 2. Título y resumen ===================== --}}
         {{-- titulo y resumen son atributos calculados del modelo Rutina

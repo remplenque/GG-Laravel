@@ -36,6 +36,25 @@ Route::middleware('auth')->group(function () {
     Route::get('rutinas', [RutinaController::class, 'index'])->name('rutinas.index');
     Route::get('rutinas/generar', [RutinaController::class, 'generar'])->name('rutinas.generar');
 
+    // El formulario "Arma tu rutina" se envía aquí (POST: manda datos). Cada
+    // envío va a gastar una llamada a la IA, así que throttle:5,1 deja máximo
+    // 5 por minuto por usuario; el sexto recibe un 429 "Demasiadas solicitudes".
+    // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
+    Route::post('rutinas/generar', [RutinaController::class, 'proponer'])
+        ->middleware('throttle:5,1')
+        ->name('rutinas.proponer');
+
+    // Vista 04 · Rutina generada: la propuesta que quedó en la sesión, y el
+    // botón Regenerar (otra llamada a la IA, por eso también con throttle).
+    // No chocan con rutinas/{rutina} porque ese exige un número (whereNumber).
+    Route::get('rutinas/propuesta', [RutinaController::class, 'propuesta'])->name('rutinas.propuesta');
+    Route::post('rutinas/propuesta/regenerar', [RutinaController::class, 'regenerar'])
+        ->middleware('throttle:5,1')
+        ->name('rutinas.regenerar');
+
+    // "Guardar en mis rutinas": pasa la propuesta de la sesión a la base de datos.
+    Route::post('rutinas/propuesta', [RutinaController::class, 'guardar'])->name('rutinas.guardar');
+
     // Detalle de una rutina. {rutina} es el id y, como el método recibe
     // "Rutina $rutina", Laravel busca la fila solo (route model binding) y
     // responde 404 si no existe. whereNumber('rutina') acepta solo números:
@@ -45,18 +64,49 @@ Route::middleware('auth')->group(function () {
         ->whereNumber('rutina')
         ->name('rutinas.show');
 
+    // Editar y borrar una rutina. Los formularios HTML solo mandan GET o
+    // POST: para PUT y DELETE se agrega @method('PUT') o @method('DELETE')
+    // dentro del <form> y Laravel lo trata como ese verbo.
+    Route::get('rutinas/{rutina}/editar', [RutinaController::class, 'editar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.editar');
+    Route::put('rutinas/{rutina}', [RutinaController::class, 'actualizar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.actualizar');
+    Route::delete('rutinas/{rutina}', [RutinaController::class, 'eliminar'])
+        ->whereNumber('rutina')
+        ->name('rutinas.eliminar');
+
     // Registrar entrenamiento (vista 05). Inicio y Rutinas enlazan aquí con
     // ?rutina={id} para abrir el registro con esa rutina precargada.
     Route::get('entrenamientos', [EntrenamientoController::class, 'index'])->name('entrenamientos.index');
     Route::get('entrenamientos/registrar', [EntrenamientoController::class, 'create'])->name('entrenamientos.create');
 
-    // Vista 02 · Coach IA (chat).
-    Route::get('coach', CoachController::class)->name('coach');
+    // Vista 02 · Coach IA (chat): ver la conversación, enviar una pregunta y
+    // empezar una nueva (borra la actual). Cada pregunta va a gastar una
+    // llamada a la IA: throttle:10,1 deja máximo 10 por minuto por usuario.
+    // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
+    Route::get('coach', [CoachController::class, 'index'])->name('coach');
+    Route::post('coach', [CoachController::class, 'preguntar'])
+        ->middleware('throttle:10,1')
+        ->name('coach.preguntar');
+    Route::delete('coach', [CoachController::class, 'nueva'])->name('coach.nueva');
 
     // Biblioteca de ejercicios y su detalle (vista 06). Aquí {ejercicio} es
     // un texto (p. ej. "bench-press"), por eso no lleva whereNumber.
     Route::get('ejercicios', [EjercicioController::class, 'index'])->name('ejercicios.index');
+
+    // "Explorar en wger" (API externa). Va ANTES de ejercicios/{ejercicio}:
+    // como ese acepta cualquier texto, si estuviera primero tomaría "wger"
+    // como el id de un ejercicio y respondería 404.
+    Route::get('ejercicios/wger', [EjercicioController::class, 'wger'])->name('ejercicios.wger');
+
     Route::get('ejercicios/{ejercicio}', [EjercicioController::class, 'show'])->name('ejercicios.show');
+
+    // "Agregar a una rutina" desde el detalle del ejercicio: la rutina elegida
+    // llega en el formulario (rutina_id), por eso no va en la URL.
+    Route::post('ejercicios/{ejercicio}/agregar', [RutinaController::class, 'agregarEjercicio'])
+        ->name('ejercicios.agregar');
 
     Route::get('perfil', PerfilController::class)->name('perfil');
 });

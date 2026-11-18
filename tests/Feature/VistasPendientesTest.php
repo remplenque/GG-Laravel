@@ -17,8 +17,6 @@ class VistasPendientesTest extends TestCase
         $user = User::factory()->create();
 
         foreach ([
-            route('coach'),
-            route('rutinas.generar'),
             route('entrenamientos.index'),
             route('entrenamientos.create'),
         ] as $url) {

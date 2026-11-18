@@ -8,8 +8,9 @@
       5. Marcas del usuario: Última vez y Mejor marca.
       6. Consejos.
       7. Tarjeta violeta "Pregúntale al coach" con preguntas sugeridas.
+      8. Agregar a una rutina.
 
-    $ejercicio, $ultimaVez y $mejorMarca los manda EjercicioController@show.
+    $ejercicio, $ultimaVez, $mejorMarca y $rutinas los manda EjercicioController@show.
     $ultimaVez y $mejorMarca son una EntrenamientoSerie o null.
 --}}
 @php
@@ -127,4 +128,34 @@
         </div>
         <p class="mt-3 text-[11px] text-tenue">Orientación general. Ante dolor o lesión, consulta a un profesional.</p>
     </x-tarjeta>
+
+    {{-- ===================== 8. Agregar a una rutina ===================== --}}
+    {{-- Elige una de sus rutinas en el <select> y la manda por POST a
+         ejercicios.agregar (RutinaController@agregarEjercicio), que lo suma
+         al final con 3 × 10. Sin rutinas, invita a armar una con la IA. --}}
+    <section class="aparecer mt-5" style="--i: 7">
+        <x-titulo-seccion texto="Agregar a una rutina" />
+
+        @if ($rutinas->isNotEmpty())
+            <form method="POST" action="{{ route('ejercicios.agregar', $ejercicio) }}" class="mt-2 flex gap-2">
+                @csrf
+                <select name="rutina_id" aria-label="Rutina"
+                        class="min-w-0 flex-1 rounded-xl border-borde bg-tarjeta text-sm text-texto focus:border-primario focus:ring-primario">
+                    @foreach ($rutinas as $rutina)
+                        <option value="{{ $rutina->id }}">{{ $rutina->nombre }}</option>
+                    @endforeach
+                </select>
+                <button type="submit"
+                        class="shrink-0 rounded-xl bg-primario-fuerte px-4 text-sm font-semibold text-white hover:bg-primario">
+                    Agregar
+                </button>
+            </form>
+            <x-input-error :messages="$errors->get('rutina_id')" class="mt-1.5" />
+        @else
+            <p class="mt-2 text-sm text-tenue">
+                Aún no tienes rutinas.
+                <a href="{{ route('rutinas.generar') }}" class="font-semibold text-primario hover:underline">Arma una con el coach</a>.
+            </p>
+        @endif
+    </section>
 </x-app-layout>

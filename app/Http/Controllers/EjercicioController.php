@@ -108,6 +108,8 @@ class EjercicioController extends Controller
             'ejercicio' => $ejercicio,
             'ultimaVez' => $ultimaVez,
             'mejorMarca' => $mejorMarca,
+            // Para el selector "Agregar a una rutina": solo id y nombre.
+            'rutinas' => $user->rutinas()->get(['id', 'nombre']),
         ]);
     }
 }

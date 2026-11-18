@@ -36,7 +36,7 @@ app/
 ├── Http/Controllers/
 │   ├── InicioController.php        # 01 · Inicio (hecho; la sugerencia aún es por reglas)
 │   ├── RutinaController.php        # Rutinas, detalle, 03 · Generar, 04 · Propuesta, guardar y editar (hecho)
-│   ├── CoachController.php         # 02 · Coach IA (pendiente)
+│   ├── CoachController.php         # 02 · Coach IA: chat, preguntar y nueva conversación (hecho; respuestas por reglas)
 │   ├── EntrenamientoController.php # Historial y 05 · Registrar (pendiente)
 │   ├── EjercicioController.php     # Biblioteca, 06 · Detalle y Explorar en wger (hecho)
 │   ├── PerfilController.php        # Perfil (hecho)
@@ -48,6 +48,7 @@ app/
     ├── Historial.php               # Racha, récord y semana (antes EntrenamientosProvider)
     ├── Formato.php                 # Miles, minutos y fechas en español
     ├── PropuestaRutina.php         # Rutina con IA: ejercicios permitidos, generar y validar
+    ├── Coach.php                   # Coach IA: instrucciones del agente, contexto y responder
     └── Wger.php                    # Cliente de la API de wger (con caché)
 config/gogym.php                    # Ajustes de la app (imágenes, MET, biblioteca, rutina con IA, wger, cuenta demo)
 database/
@@ -59,7 +60,8 @@ resources/views/
 ├── rutinas/                        # index, show, generar, propuesta, editar (hechas)
 ├── ejercicios/                     # index, show, wger (hechas)
 ├── perfil/                         # show (hecha)
-├── coach/ entrenamientos/          # pendientes
+├── coach/                          # index (hecha)
+├── entrenamientos/                 # pendiente
 └── auth/                           # Breeze, con el diseño de Go Gym
 ```
 
@@ -73,6 +75,21 @@ cada día pasa a ser una rutina y entra a la rotación de Inicio y Perfil.
 nivel), genera la propuesta y la valida antes de mostrarla. **Por ahora `generar()` usa
 reglas fijas**: para conectar el `RutinaAgent` de `laravel/ai` basta con cambiar el
 cuerpo de ese método (los pasos están documentados ahí); el resto no cambia.
+
+## Coach IA
+
+`/coach` (vista 02) → `POST coach` (con throttle) → vuelve a `/coach` con la pregunta y
+la respuesta. El `+` del encabezado (`DELETE coach`) borra la conversación. Desde el
+detalle de un ejercicio se llega con `?pregunta=…` y el texto queda escrito en el campo.
+Si la pregunta nombra un ejercicio del catálogo, la respuesta trae "Ver ficha".
+
+`App\Support\Coach` tiene las **instrucciones del CoachAgent** (rol, seguridad y
+formato), el contexto que se le manda (solo nivel y objetivo, nunca nombre ni correo) y
+`responder()`. **Por ahora `responder()` usa reglas fijas** (dudas frecuentes + datos del
+catálogo) y la conversación vive en la sesión. Para conectar la IA: cambiar el cuerpo de
+`responder()` (pasos documentados ahí) y, para guardar la conversación por cuenta, los
+métodos `mensajes()` / `guardarMensajes()` de `CoachController`. Si la IA lanza una
+excepción, el controlador ya muestra un aviso en vez de un error 500.
 
 Las vistas pendientes muestran `<x-en-construccion>`. Para trabajar una, reemplaza ese
 componente en su archivo de `resources/views` y completa el método de su controlador.

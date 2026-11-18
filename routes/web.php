@@ -82,8 +82,15 @@ Route::middleware('auth')->group(function () {
     Route::get('entrenamientos', [EntrenamientoController::class, 'index'])->name('entrenamientos.index');
     Route::get('entrenamientos/registrar', [EntrenamientoController::class, 'create'])->name('entrenamientos.create');
 
-    // Vista 02 · Coach IA (chat).
-    Route::get('coach', CoachController::class)->name('coach');
+    // Vista 02 · Coach IA (chat): ver la conversación, enviar una pregunta y
+    // empezar una nueva (borra la actual). Cada pregunta va a gastar una
+    // llamada a la IA: throttle:10,1 deja máximo 10 por minuto por usuario.
+    // Cuando Ian defina el limitador 'ia', se cambia por throttle:ia.
+    Route::get('coach', [CoachController::class, 'index'])->name('coach');
+    Route::post('coach', [CoachController::class, 'preguntar'])
+        ->middleware('throttle:10,1')
+        ->name('coach.preguntar');
+    Route::delete('coach', [CoachController::class, 'nueva'])->name('coach.nueva');
 
     // Biblioteca de ejercicios y su detalle (vista 06). Aquí {ejercicio} es
     // un texto (p. ej. "bench-press"), por eso no lleva whereNumber.

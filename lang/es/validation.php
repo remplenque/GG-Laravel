@@ -35,5 +35,6 @@ return [
         'apellido' => 'apellido',
         'email' => 'correo',
         'password' => 'contraseña',
+        'pregunta' => 'pregunta',
     ],
 ];

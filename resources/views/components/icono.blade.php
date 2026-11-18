@@ -25,6 +25,8 @@
         'balanza' => '<path d="M5 20h14a2 2 0 0 0 2-2V7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v11a2 2 0 0 0 2 2z"/><path d="M8 9a4 4 0 0 1 8 0M12 9l2-2"/>',
         'reloj' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
         'buscar' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+        'enviar' => '<path d="M3.7 3.3a.7.7 0 0 1 .9-.2l16 8.3a.7.7 0 0 1 0 1.2l-16 8.3a.7.7 0 0 1-1-.8L6 12 3.6 4.1a.7.7 0 0 1 .1-.8z"/><path d="M6 12h8"/>',
+        'candado' => '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     ];
 @endphp
 

@@ -11,33 +11,76 @@
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-    --color-fondo: #0b1220;
-    --color-tarjeta: #121a2b;
+    --color-fondo: #0a101d;
+    --color-tarjeta: #111a2b;
     --color-tarjeta-alta: #172238;
-    --color-borde: #223049;
+    --color-borde: #22304a;
     --color-texto: #e6ebf5;
     --color-tenue: #8b97ad;
     --color-primario: #4c8dff;
     --color-primario-fuerte: #2f6bff;
     --color-ia: #a78bfa;
+    --color-ia-fuerte: #7c5cf5;
     --color-ia-fondo: #1b1840;
     --color-ia-borde: #3d3380;
     --color-error: #f87171;
     --color-exito: #4ade80;
+    --color-fuego: #fb923c;
+
+    --ease-salida: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-rebote: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --animate-flotar: flotar 6s ease-in-out infinite;
+    --animate-girar: girar 1s linear infinite;
 }
 
 @layer base {
     html {
         color-scheme: dark;
         -webkit-tap-highlight-color: transparent;
+        scrollbar-color: var(--color-borde) transparent;
     }
 
     body {
         @apply bg-fondo text-texto font-sans antialiased;
+        min-height: 100dvh;
+    }
+
+    /* Luces de fondo: dos halos muy suaves (azul arriba, violeta abajo) que
+       le dan profundidad al fondo oscuro sin distraer. Van fijos. */
+    body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+            radial-gradient(60rem 40rem at 10% -10%, color-mix(in oklab, var(--color-primario-fuerte) 16%, transparent), transparent 60%),
+            radial-gradient(50rem 36rem at 110% 110%, color-mix(in oklab, var(--color-ia-fuerte) 14%, transparent), transparent 60%);
+    }
+
+    ::selection {
+        background: color-mix(in oklab, var(--color-primario) 45%, transparent);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-primario);
+        outline-offset: 2px;
     }
 
     [x-cloak] {
         display: none !important;
+    }
+
+    /* Los number input sin flechitas: en el celular estorban. */
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    input[type='number'] {
+        -moz-appearance: textfield;
     }
 }
 
@@ -59,28 +102,90 @@
     padding-bottom: env(safe-area-inset-bottom);
 }
 
+@utility sin-scrollbar {
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Texto con degradado de marca (títulos destacados). */
+@utility texto-marca {
+    background: linear-gradient(100deg, #8fb6ff 0%, var(--color-primario) 40%, var(--color-ia) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
 
 /* ==========================================================================
-   Animaciones de entrada (Inicio y Rutinas)
+   Transiciones entre páginas (View Transitions API)
+   --------------------------------------------------------------------------
+   Go Gym es una app de varias páginas (Blade). Con @view-transition el
+   navegador funde una página con la siguiente en vez de "pestañear". La
+   barra inferior y la lateral tienen nombre propio: quedan quietas mientras
+   el contenido cambia, y la píldora de la pestaña activa se desliza sola de
+   una pestaña a otra. Navegadores sin soporte navegan como siempre.
+   ========================================================================== */
+@view-transition {
+    navigation: auto;
+}
+
+::view-transition-old(root) {
+    animation: 160ms ease-in both salir-pagina;
+}
+
+::view-transition-new(root) {
+    animation: 280ms var(--ease-salida) both entrar-pagina;
+}
+
+::view-transition-group(indicador-nav),
+::view-transition-group(indicador-lateral) {
+    animation-duration: 340ms;
+    animation-timing-function: var(--ease-salida);
+}
+
+@keyframes salir-pagina {
+    to {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes entrar-pagina {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+}
+
+/* ==========================================================================
+   Animaciones de entrada
    --------------------------------------------------------------------------
    Basadas en las de Go Gym en Flutter (Aparecer y Rebote), hechas solo con
-   CSS: corren una vez cada vez que se carga la página. Son cortas y suaves a
-   propósito: acompañan la llegada a la pantalla sin llamar la atención.
+   CSS: corren una vez cada vez que se carga la página.
 
    El retraso de cada elemento se da desde el HTML con una variable CSS:
      style="--i: 2"           → entra en cascada: 2 × 45 ms después del primero.
      style="--retraso: 200ms" → retraso exacto (cuadritos de la racha).
-
-   "both" en animation deja el elemento con el estado del 0 % mientras espera
-   su turno (invisible) y con el del 100 % al terminar (en su lugar).
    ========================================================================== */
-
-/* Aparecer: llega desvaneciéndose y subiendo apenas 12 px. La curva es
-   easeOutCubic (rápida al principio, suave al final). */
 @keyframes aparecer {
     from {
         opacity: 0;
-        transform: translateY(12px);
+        transform: translateY(14px);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+}
+
+@keyframes crecer {
+    from {
+        opacity: 0;
+        transform: scale(0.6);
     }
     to {
         opacity: 1;
@@ -88,41 +193,322 @@
     }
 }
 
-/* Crecer: parte al 85 % de su tamaño y llega al 100 %, sin rebote. */
-@keyframes crecer {
+@keyframes subir-barra {
     from {
-        opacity: 0;
-        transform: scale(0.85);
+        transform: scaleY(0);
+    }
+}
+
+@keyframes flotar {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes girar {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes llama {
+    0%,
+    100% {
+        transform: scale(1) rotate(-2deg);
+        filter: drop-shadow(0 0 0 transparent);
+    }
+    50% {
+        transform: scale(1.12) rotate(3deg);
+        filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-fuego) 70%, transparent));
+    }
+}
+
+@keyframes brillo {
+    from {
+        transform: translateX(-120%) skewX(-20deg);
     }
     to {
-        opacity: 1;
-        transform: none;
+        transform: translateX(220%) skewX(-20deg);
+    }
+}
+
+@keyframes pulso-ia {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-ia) 45%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 10px transparent;
+    }
+}
+
+@keyframes destello {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+@keyframes toast-entrar {
+    from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.96);
+    }
+}
+
+@keyframes toast-tiempo {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes progreso-nav {
+    0% {
+        transform: scaleX(0);
+    }
+    40% {
+        transform: scaleX(0.55);
+    }
+    100% {
+        transform: scaleX(0.92);
+    }
+}
+
+@keyframes latido {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    15% {
+        transform: scale(1.18);
+    }
+    30% {
+        transform: scale(1);
+    }
+}
+
+/* Halo giratorio para lo que hace la IA: el ángulo se anima con @property. */
+@property --angulo {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes rotar-angulo {
+    to {
+        --angulo: 360deg;
     }
 }
 
 @layer components {
+    /* "backwards" (y no "both"): durante la espera el elemento queda en el
+       estado inicial, y al terminar la animación suelta el transform para
+       que los efectos de hover y de toque sigan funcionando. */
     .aparecer {
-        animation: aparecer 380ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
-        /* var(--i, 0): si el elemento no define --i, vale 0 (sin retraso). */
+        animation: aparecer 460ms var(--ease-salida) backwards;
         animation-delay: calc(var(--i, 0) * 45ms);
     }
 
     .crecer {
-        animation: crecer 300ms ease-out both;
+        animation: crecer 380ms var(--ease-rebote) backwards;
         animation-delay: var(--retraso, 0ms);
     }
-}
 
-/* Si la persona pidió en su sistema reducir el movimiento, no se anima nada:
-   todo aparece directo en su lugar. Es una cuestión de accesibilidad (a
-   algunas personas el movimiento les marea). */
-@media (prefers-reduced-motion: reduce) {
-    .aparecer,
-    .crecer {
-        animation: none;
+    .barra-crece {
+        transform-origin: bottom;
+        animation: subir-barra 700ms var(--ease-salida) both;
+        animation-delay: var(--retraso, 0ms);
+    }
+
+    .llama-viva {
+        transform-origin: 50% 85%;
+        animation: llama 1.6s ease-in-out infinite;
+    }
+
+    .latir {
+        animation: latido 1.4s ease-in-out infinite;
+    }
+
+    /* Tarjetas: brillo sutil arriba y borde que se enciende al pasar el mouse. */
+    .tarjeta {
+        background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%);
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.04),
+            0 1px 2px rgb(0 0 0 / 0.25);
+        transition:
+            border-color 200ms,
+            transform 200ms var(--ease-salida),
+            box-shadow 200ms,
+            background-color 200ms;
+    }
+
+    a.tarjeta:hover,
+    button.tarjeta:hover {
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.05),
+            0 10px 30px -12px color-mix(in oklab, var(--color-primario) 40%, transparent);
+        transform: translateY(-1px);
+    }
+
+    a.tarjeta:active,
+    button.tarjeta:active {
+        transform: scale(0.985);
+    }
+
+    /* Tarjeta de IA con borde animado (degradado cónico que gira). */
+    .aura {
+        position: relative;
+        isolation: isolate;
+        border-color: transparent !important;
+        background:
+            linear-gradient(160deg, color-mix(in oklab, var(--color-ia-fondo) 92%, white 2%), #141331) padding-box,
+            conic-gradient(
+                    from var(--angulo),
+                    var(--color-ia-borde) 0deg,
+                    var(--color-ia) 60deg,
+                    var(--color-primario) 120deg,
+                    var(--color-ia-borde) 180deg,
+                    var(--color-ia-borde) 360deg
+                )
+                border-box;
+        animation: rotar-angulo 6s linear infinite;
+    }
+
+    /* Una tarjeta de IA que además entra con "aparecer" corre las dos
+       animaciones a la vez. */
+    .aura.aparecer {
+        animation:
+            aparecer 460ms var(--ease-salida) backwards,
+            rotar-angulo 6s linear infinite;
+        animation-delay: calc(var(--i, 0) * 45ms), 0ms;
+    }
+
+    .aura::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        background: radial-gradient(30rem 12rem at 0% 0%, color-mix(in oklab, var(--color-ia) 14%, transparent), transparent 70%);
+        pointer-events: none;
+    }
+
+    /* Botón principal: degradado azul, sombra de color y un destello que
+       cruza al pasar el mouse. */
+    .boton-primario {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        background: linear-gradient(180deg, #5b97ff, var(--color-primario-fuerte));
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.22),
+            0 8px 22px -10px color-mix(in oklab, var(--color-primario-fuerte) 90%, transparent);
+        transition:
+            transform 160ms var(--ease-salida),
+            box-shadow 200ms,
+            filter 200ms,
+            opacity 200ms;
+    }
+
+    .boton-primario::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        z-index: -1;
+        background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+        transform: translateX(-120%) skewX(-20deg);
+    }
+
+    .boton-primario:hover {
+        filter: brightness(1.08);
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.25),
+            0 12px 28px -10px color-mix(in oklab, var(--color-primario) 95%, transparent);
+    }
+
+    .boton-primario:hover::after {
+        animation: brillo 700ms ease-out;
+    }
+
+    .boton-primario:active {
+        transform: scale(0.97);
+    }
+
+    .boton-primario:disabled {
+        filter: saturate(0.6);
+        opacity: 0.65;
+        cursor: progress;
+    }
+
+    .boton-ia {
+        background: linear-gradient(180deg, #8f74fb, var(--color-ia-fuerte));
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.22),
+            0 8px 22px -10px color-mix(in oklab, var(--color-ia-fuerte) 90%, transparent);
+    }
+
+    .presionable {
+        transition: transform 160ms var(--ease-salida);
+    }
+
+    .presionable:active {
+        transform: scale(0.95);
+    }
+
+    /* Esqueleto de carga: un reflejo que recorre el bloque. */
+    .esqueleto {
+        background: linear-gradient(
+            90deg,
+            var(--color-tarjeta-alta) 0%,
+            color-mix(in oklab, var(--color-tarjeta-alta) 70%, white 8%) 50%,
+            var(--color-tarjeta-alta) 100%
+        );
+        background-size: 200% 100%;
+        animation: destello 1.4s linear infinite;
+    }
+
+    .orbe-ia {
+        background: radial-gradient(circle at 35% 30%, #c4b5fd, var(--color-ia-fuerte) 55%, #312e81);
+        animation: pulso-ia 2s ease-out infinite;
+    }
+
+    .toast {
+        animation: toast-entrar 420ms var(--ease-rebote) both;
+    }
+
+    .toast-tiempo {
+        transform-origin: left;
+        animation: toast-tiempo var(--duracion, 4500ms) linear forwards;
+    }
+
+    .progreso-nav {
+        transform-origin: left;
+        animation: progreso-nav 2.4s var(--ease-salida) forwards;
+    }
+
+    /* Chips seleccionables de los formularios (radio/checkbox "peer"). */
+    .chip-check {
+        transition:
+            background-color 160ms,
+            border-color 160ms,
+            color 160ms,
+            transform 160ms var(--ease-salida);
+    }
+
+    .chip-check:active {
+        transform: scale(0.96);
     }
 }
-
 
 /* ==========================================================================
    Coach IA (vista 02)
@@ -155,6 +541,7 @@
 
     .respuesta-coach li::marker {
         color: var(--color-ia);
+        font-weight: 700;
     }
 
     .respuesta-coach strong {
@@ -162,8 +549,28 @@
         color: white;
     }
 
-    /* "Escribiendo…": tres puntos que suben y bajan en cadena mientras la
-       pregunta viaja al servidor. */
+    /* Las respuestas nuevas se revelan bloque por bloque. */
+    .respuesta-coach.revelar > * {
+        animation: aparecer 420ms var(--ease-salida) both;
+    }
+
+    .respuesta-coach.revelar > :nth-child(2) {
+        animation-delay: 120ms;
+    }
+
+    .respuesta-coach.revelar > :nth-child(3) {
+        animation-delay: 240ms;
+    }
+
+    .respuesta-coach.revelar > :nth-child(4) {
+        animation-delay: 360ms;
+    }
+
+    .respuesta-coach.revelar > :nth-child(n + 5) {
+        animation-delay: 480ms;
+    }
+
+    /* "Escribiendo…": tres puntos que suben y bajan en cadena. */
     .escribiendo span {
         animation: escribiendo 1s ease-in-out infinite;
     }
@@ -190,8 +597,54 @@
     }
 }
 
+/* ==========================================================================
+   Ficha del ejercicio: las dos fotos (inicio y final del movimiento) se
+   alternan para mostrar el gesto completo.
+   ========================================================================== */
+@keyframes alternar-foto {
+    0%,
+    42% {
+        opacity: 0;
+    }
+    50%,
+    92% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@layer components {
+    .foto-movimiento {
+        animation: alternar-foto 3.2s ease-in-out infinite;
+    }
+
+    .grupo-foto:hover .foto-final {
+        opacity: 1;
+    }
+}
+
+/* Si la persona pidió en su sistema reducir el movimiento, no se anima nada:
+   todo aparece directo en su lugar (accesibilidad). */
 @media (prefers-reduced-motion: reduce) {
-    .escribiendo span {
-        animation: none;
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0ms !important;
+        transition-duration: 1ms !important;
+    }
+
+    .aura,
+    .foto-movimiento {
+        animation: none !important;
+    }
+
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
     }
 }

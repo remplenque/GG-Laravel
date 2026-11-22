@@ -1,79 +1,44 @@
 import Alpine from 'alpinejs';
 
+import contar from './modulos/contar';
+import { iniciarProgresoNavegacion } from './modulos/navegacion';
+import { confeti } from './modulos/confeti';
+import coach from './modulos/coach';
+import registro from './modulos/registro';
+import busqueda from './modulos/busqueda';
+
 window.Alpine = Alpine;
+window.confeti = confeti;
 
 /*
- * Directiva x-contar: el número cuenta desde 0 hasta su valor al cargar la
- * página (como NumeroAnimado en la versión de Flutter).
+ * Go Gym usa Alpine.js para todo lo que pasa en el navegador sin recargar la
+ * página. Cada pieza vive en su archivo dentro de ./modulos:
  *
- * Uso en Blade:
- *     <span x-data x-contar.300="8240">8.240</span>
- *     <p x-data x-contar.350="12">12 días seguidos</p>
+ *   - x-contar:   números que cuentan desde 0 (Inicio, Perfil).
+ *   - coach:      el chat del Coach IA con envío sin recargar.
+ *   - registro:   cronómetro, series hechas y descanso al registrar.
+ *   - busqueda:   búsqueda en vivo de la biblioteca.
+ *   - navegación: barra de progreso arriba mientras carga otra página.
+ *   - confeti:    celebración al guardar un entrenamiento o batir un récord.
  *
- *   - El valor entre comillas es el número final, sin formato.
- *   - Solo cambia el primer número del texto; lo demás ("días seguidos")
- *     queda igual mientras cuenta.
- *   - El modificador (.300) es el retraso en milisegundos antes de empezar,
- *     para que cuente cuando su tarjeta ya terminó de aparecer.
- *   - El texto de adentro (8.240) es el que manda el servidor: si JavaScript
- *     no carga, o la persona pidió reducir el movimiento, se queda ese.
+ * Todo es mejora progresiva: sin JavaScript, los formularios y enlaces
+ * funcionan igual (Blade + POST normales).
  */
-Alpine.directive('contar', (el, { expression, modifiers }, { cleanup }) => {
-    const final = Number(expression);
-    const sinMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+Alpine.directive('contar', contar);
+Alpine.data('coach', coach);
+Alpine.data('registro', registro);
+Alpine.data('busqueda', busqueda);
 
-    // Si el valor no es un número o no se debe animar, no se toca el texto.
-    if (!Number.isFinite(final) || final === 0 || sinMovimiento) {
-        return;
-    }
-
-    const retraso = Number(modifiers[0]) || 0;
-    // Corta: el número llega rápido y no distrae.
-    const duracion = 700;
-    // El texto original, para dejarlo exacto al terminar (con su formato).
-    const textoFinal = el.textContent;
-
-    // Punto de miles a la chilena escrito a mano: Intl en español no agrupa
-    // los números de 4 cifras (daría "8240" en vez de "8.240").
-    const formatear = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-    // Escribe el texto original con el primer número cambiado por "n".
-    // /\d[\d.]*/ calza una cifra seguida de más cifras o puntos ("8.240").
-    const mostrar = (n) => {
-        el.textContent = textoFinal.replace(/\d[\d.]*/, formatear(n));
-    };
-
-    // easeOutCubic: sube rápido al principio y frena al llegar.
-    const curva = (t) => 1 - Math.pow(1 - t, 3);
-
-    let cuadro = null;
-    let inicio = null;
-
-    // requestAnimationFrame llama a "paso" en cada cuadro que dibuja el
-    // navegador (~60 por segundo) con la hora actual en milisegundos.
-    const paso = (ahora) => {
-        inicio ??= ahora;
-        const t = Math.min(1, (ahora - inicio) / duracion);
-        if (t < 1) {
-            mostrar(final * curva(t));
-            cuadro = requestAnimationFrame(paso);
-        } else {
-            // Al final se deja el texto tal cual lo mandó el servidor.
-            el.textContent = textoFinal;
+/* Toast: se cierra solo pasado "duracion" (ms) salvo que sea un error. */
+Alpine.data('toast', (duracion = 4500) => ({
+    visible: true,
+    init() {
+        if (duracion > 0) {
+            setTimeout(() => (this.visible = false), duracion);
         }
-    };
+    },
+}));
 
-    // Parte en 0 y, pasado el retraso, empieza a contar.
-    mostrar(0);
-    const espera = setTimeout(() => {
-        cuadro = requestAnimationFrame(paso);
-    }, retraso);
-
-    // Si Alpine saca el elemento de la página, se detiene todo.
-    cleanup(() => {
-        clearTimeout(espera);
-        cancelAnimationFrame(cuadro);
-    });
-});
+iniciarProgresoNavegacion();
 
 Alpine.start();

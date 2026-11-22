@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // En Vercel (y detrás de cualquier proxy) la conexión HTTPS termina
+        // antes de llegar a PHP: se confía en las cabeceras X-Forwarded-*
+        // para que las URL salgan con https y la IP real llegue al limitador.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

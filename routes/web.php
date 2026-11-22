@@ -119,6 +119,12 @@ Route::middleware('auth')->group(function () {
         ->name('ejercicios.agregar');
 
     Route::get('perfil', PerfilController::class)->name('perfil');
+
+    // Editar los datos de entrenamiento (objetivo, nivel, peso, días y
+    // horario) y borrar la cuenta con todos sus datos (Ley 21.719).
+    Route::get('perfil/editar', [PerfilController::class, 'editar'])->name('perfil.editar');
+    Route::put('perfil', [PerfilController::class, 'actualizar'])->name('perfil.actualizar');
+    Route::delete('perfil', [PerfilController::class, 'eliminar'])->name('perfil.eliminar');
 });
 
 // Login, registro, recuperar contraseña y cerrar sesión (Laravel Breeze).

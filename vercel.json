@@ -1,0 +1,67 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": null,
+    "installCommand": "npm ci",
+    "buildCommand": "npm run build",
+    "outputDirectory": "public",
+    "regions": [
+        "pdx1"
+    ],
+    "build": {
+        "env": {
+            "APP_ENV": "production",
+            "DB_CONNECTION": "pgsql",
+            "DB_SSLMODE": "require",
+            "APP_TIMEZONE": "America/Santiago",
+            "APP_LOCALE": "es",
+            "LOG_CHANNEL": "stderr",
+            "DB_SCHEMA": "gogym"
+        }
+    },
+    "functions": {
+        "api/index.php": {
+            "runtime": "vercel-php@0.9.0",
+            "maxDuration": 60
+        }
+    },
+    "routes": [
+        {
+            "src": "/build/(.*)",
+            "headers": {
+                "Cache-Control": "public, max-age=31536000, immutable"
+            },
+            "continue": true
+        },
+        {
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/api/index.php"
+        }
+    ],
+    "env": {
+        "APP_NAME": "Go Gym",
+        "APP_ENV": "production",
+        "APP_DEBUG": "false",
+        "APP_LOCALE": "es",
+        "APP_FALLBACK_LOCALE": "en",
+        "APP_TIMEZONE": "America/Santiago",
+        "APP_CONFIG_CACHE": "/tmp/config.php",
+        "APP_EVENTS_CACHE": "/tmp/events.php",
+        "APP_PACKAGES_CACHE": "/tmp/packages.php",
+        "APP_ROUTES_CACHE": "/tmp/routes.php",
+        "APP_SERVICES_CACHE": "/tmp/services.php",
+        "VIEW_COMPILED_PATH": "/tmp/views",
+        "DB_CONNECTION": "pgsql",
+        "DB_SSLMODE": "require",
+        "SESSION_DRIVER": "database",
+        "SESSION_SECURE_COOKIE": "true",
+        "CACHE_STORE": "database",
+        "QUEUE_CONNECTION": "sync",
+        "LOG_CHANNEL": "stderr",
+        "LOG_LEVEL": "warning",
+        "MAIL_MAILER": "log",
+        "DB_SCHEMA": "gogym"
+    }
+}

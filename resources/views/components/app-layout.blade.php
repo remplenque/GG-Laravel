@@ -1,5 +1,9 @@
-{{-- Marco de las pantallas con sesión: columna de ancho de celular y, si
-     $navegacion, la barra inferior. $pie va fijo abajo (p. ej. "Empezar rutina"). --}}
+{{-- Marco de las pantallas con sesión.
+
+     En el celular: una columna de ancho de teléfono y, si $navegacion, la
+     barra inferior. En pantallas grandes (lg): barra lateral fija a la
+     izquierda y una columna más ancha. $pie va fijo abajo (p. ej. "Empezar
+     rutina") y reemplaza a la barra inferior. --}}
 @props(['titulo' => null, 'navegacion' => true])
 
 <!DOCTYPE html>
@@ -8,18 +12,33 @@
         <x-head :titulo="$titulo" />
     </head>
     <body>
-        <div class="mx-auto min-h-dvh max-w-md border-borde sm:border-x">
-            <main @class(['px-4 pt-4', 'pb-28' => $navegacion || isset($pie), 'pb-8' => ! $navegacion && ! isset($pie)])>
-                {{ $slot }}
-            </main>
+        <a href="#contenido"
+           class="sr-only z-[110] rounded-xl bg-primario-fuerte px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+            Saltar al contenido
+        </a>
 
-            @isset($pie)
-                <div class="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-md border-t border-borde bg-fondo/95 px-4 pt-3 backdrop-blur pb-seguro">
-                    <div class="pb-3">{{ $pie }}</div>
-                </div>
-            @elseif ($navegacion)
-                <x-barra-navegacion />
-            @endisset
+        <x-barra-lateral />
+
+        <div class="lg:pl-64">
+            <div class="mx-auto min-h-dvh max-w-md lg:max-w-2xl">
+                <main id="contenido" @class([
+                    'px-4 pt-4 lg:px-8 lg:pt-8',
+                    'pb-32' => isset($pie),
+                    'pb-28 lg:pb-12' => $navegacion && ! isset($pie),
+                    'pb-10' => ! $navegacion && ! isset($pie),
+                ])>
+                    {{ $slot }}
+                </main>
+
+                @isset($pie)
+                    <div class="fixed inset-x-0 bottom-0 z-20 border-t border-borde/80 bg-fondo/85 backdrop-blur-xl pb-seguro lg:left-64"
+                         style="view-transition-name: pie-fijo">
+                        <div class="mx-auto max-w-md px-4 pt-3 pb-3 lg:max-w-2xl lg:px-8">{{ $pie }}</div>
+                    </div>
+                @elseif ($navegacion)
+                    <x-barra-navegacion />
+                @endisset
+            </div>
         </div>
     </body>
 </html>

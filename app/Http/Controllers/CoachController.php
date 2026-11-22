@@ -6,6 +6,7 @@ use App\Ai\Agents\CoachAgent;
 use App\Models\Ejercicio;
 use App\Support\Coach;
 use App\Support\ProveedoresIa;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,8 +59,14 @@ class CoachController extends Controller
         ]);
     }
 
-    /** Envía una pregunta y guarda la pregunta y la respuesta. */
-    public function preguntar(Request $request, Coach $coach): RedirectResponse
+    /**
+     * Envía una pregunta y guarda la pregunta y la respuesta.
+     *
+     * Con JavaScript, el chat la envía con fetch pidiendo JSON y recibe el
+     * HTML de los dos mensajes nuevos para agregarlos sin recargar. Sin
+     * JavaScript es un POST normal que vuelve a /coach (Post/Redirect/Get).
+     */
+    public function preguntar(Request $request, Coach $coach): RedirectResponse|JsonResponse
     {
         $datos = $request->validate([
             'pregunta' => ['required', 'string', 'max:'.Coach::MAX_PREGUNTA],
@@ -80,10 +87,15 @@ class CoachController extends Controller
             // Cuota agotada, proveedor caído, respuesta vacía… Se registra en
             // el log y la persona ve un aviso con su pregunta aún escrita.
             report($error);
+            $aviso = 'El coach no pudo responder ahora. Espera un momento y vuelve a intentarlo.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $aviso], 503);
+            }
 
             return back()
                 ->withInput()
-                ->with('error', 'El coach no pudo responder ahora. Espera un momento y vuelve a intentarlo.');
+                ->with('error', $aviso);
         }
 
         if ($coach->ultimaConversacionId() !== null) {
@@ -93,6 +105,24 @@ class CoachController extends Controller
             $mensajes[] = ['rol' => 'usuario', 'texto' => $pregunta, 'ejercicio_id' => null];
             $mensajes[] = ['rol' => 'coach', 'texto' => $respuesta, 'ejercicio_id' => $ejercicio?->id];
             $this->guardarMensajes($request, $mensajes);
+        }
+
+        if ($request->expectsJson()) {
+            $nuevos = [
+                ['rol' => 'usuario', 'texto' => $pregunta, 'ejercicio_id' => null],
+                ['rol' => 'coach', 'texto' => $respuesta, 'ejercicio_id' => $ejercicio?->id],
+            ];
+            $ejercicios = collect($ejercicio ? [$ejercicio->id => $ejercicio->nombre] : []);
+
+            return response()->json([
+                'html' => collect($nuevos)
+                    ->map(fn (array $mensaje) => view('coach._mensaje', [
+                        'mensaje' => $mensaje,
+                        'ejercicios' => $ejercicios,
+                        'nuevo' => true,
+                    ])->render())
+                    ->implode(''),
+            ]);
         }
 
         return redirect()->route('coach');

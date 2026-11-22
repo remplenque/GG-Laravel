@@ -29,7 +29,7 @@
         <div class="aparecer flex items-center gap-3" style="--i: 0">
             {{-- route('rutinas.index') arma la URL de la lista por su nombre. --}}
             <a href="{{ route('rutinas.index') }}"
-               class="grid size-10 shrink-0 place-items-center rounded-xl border border-borde bg-tarjeta text-texto hover:border-primario/60"
+               class="presionable grid size-10 shrink-0 place-items-center rounded-xl border border-borde bg-tarjeta text-texto transition hover:-translate-x-0.5 hover:border-primario/60"
                aria-label="Volver a mis rutinas">
                 <x-icono nombre="flecha-izq" />
             </a>
@@ -56,7 +56,7 @@
              ("Push A · Pecho y hombro" y "5 ejercicios · 55 min · Intermedio"). --}}
         {{-- El título y su resumen entran juntos, en el mismo turno. --}}
         <div class="aparecer" style="--i: 1">
-            <h1 class="mt-4 font-display text-2xl font-bold leading-tight">{{ $rutina->titulo }}</h1>
+            <h1 class="mt-4 font-display text-2xl font-bold leading-tight lg:text-3xl">{{ $rutina->titulo }}</h1>
             <p class="mt-1 text-xs text-tenue">{{ $rutina->resumen }}</p>
         </div>
 
@@ -65,14 +65,14 @@
         @if (count($rutina->grupos) > 1)
             {{-- -mx-4 px-4 + overflow-x-auto: si no caben, se deslizan de lado
                  de borde a borde de la pantalla, como en un celular. --}}
-            <div class="aparecer -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1" style="--i: 2"
+            <div class="aparecer sin-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:-mx-8 lg:px-8" style="--i: 2"
                  role="tablist" aria-label="Filtrar por grupo muscular">
                 {{-- "Todos" vuelve a mostrar la rutina completa. :class y
                      :aria-selected (con dos puntos) los calcula Alpine según
                      el valor actual de "grupo". --}}
                 <button type="button" role="tab" @click="grupo = null"
                         :aria-selected="grupo === null"
-                        :class="grupo === null ? 'border-primario-fuerte bg-primario-fuerte text-white' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
+                        :class="grupo === null ? 'border-primario-fuerte bg-primario-fuerte text-white shadow-[0_6px_18px_-8px_rgb(47_107_255)]' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
                         class="shrink-0 rounded-[10px] border px-4 py-2 text-xs font-semibold transition">
                     Todos
                 </button>
@@ -82,7 +82,7 @@
                          con las comillas bien puestas ('Pecho'). --}}
                     <button type="button" role="tab" @click="grupo = @js($grupo)"
                             :aria-selected="grupo === @js($grupo)"
-                            :class="grupo === @js($grupo) ? 'border-primario-fuerte bg-primario-fuerte text-white' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
+                            :class="grupo === @js($grupo) ? 'border-primario-fuerte bg-primario-fuerte text-white shadow-[0_6px_18px_-8px_rgb(47_107_255)]' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
                             class="shrink-0 whitespace-nowrap rounded-[10px] border px-4 py-2 text-xs font-semibold transition">
                         {{ $grupo }}
                     </button>
@@ -133,6 +133,19 @@
                 <p class="mt-2 text-sm leading-relaxed">
                     Pregúntale al coach cómo se hace un ejercicio, cuánto descansar o con qué reemplazarlo si te falta una máquina.
                 </p>
+                @php($primero = $rutina->ejercicios->first()?->ejercicio)
+                @if ($primero)
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <a href="{{ route('coach', ['pregunta' => '¿Cómo caliento antes de '.$rutina->nombre.'?']) }}"
+                           class="presionable rounded-full border border-ia-borde px-3 py-1.5 text-xs font-medium text-texto transition hover:bg-white/5">
+                            ¿Cómo caliento antes?
+                        </a>
+                        <a href="{{ route('coach', ['pregunta' => '¿Cuál es el error más común en '.Str::lower($primero->nombre).'?']) }}"
+                           class="presionable rounded-full border border-ia-borde px-3 py-1.5 text-xs font-medium text-texto transition hover:bg-white/5">
+                            Técnica de {{ Str::lower($primero->nombre) }}
+                        </a>
+                    </div>
+                @endif
             </x-tarjeta>
         @endif
     </div>
@@ -146,12 +159,12 @@
                  segunda toma el resto (1fr), como en el mockup. --}}
             <div class="grid grid-cols-[auto_1fr] gap-2">
                 <a href="{{ route('coach') }}"
-                   class="flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-ia-borde bg-tarjeta px-4 text-sm font-semibold text-texto hover:bg-white/5">
+                   class="presionable flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-ia-borde bg-tarjeta px-4 text-sm font-semibold text-texto transition hover:border-ia/60 hover:bg-white/5">
                     <x-icono nombre="chispas" class="size-4 text-ia" /> Coach IA
                 </a>
                 {{-- Abre "Registrar entrenamiento" con esta rutina (?rutina=ID). --}}
                 <a href="{{ route('entrenamientos.create', ['rutina' => $rutina->id]) }}"
-                   class="flex h-12 items-center justify-center gap-2 rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario">
+                   class="boton-primario flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white">
                     <x-icono nombre="play" class="size-4" /> Empezar rutina
                 </a>
             </div>

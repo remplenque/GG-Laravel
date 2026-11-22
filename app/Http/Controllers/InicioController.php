@@ -76,6 +76,11 @@ class InicioController extends Controller
                 // Los 7 cuadritos de la semana con su estado (entrenado, hoy…).
                 'dias' => $historial->semana($hoy),
             ],
+            // Meta de la semana: los días de entrenamiento del perfil (o 3
+            // si aún no los elige). La barra de la racha la compara con las
+            // sesiones hechas.
+            'meta' => count($user->dias_entrenamiento ?? []) ?: 3,
+            'perfilIncompleto' => ! $user->objetivo || ! $user->nivel || ! $user->peso_kg || empty($user->dias_entrenamiento),
             'estaSemana' => [
                 'sesiones' => $semana->count(),
                 // volumen = suma de kg × reps de todas las series de la semana.

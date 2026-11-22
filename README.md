@@ -4,6 +4,8 @@ Versión web (mobile-first) de Go Gym para la Unidad 3. Mantiene la idea, el dis
 y el modelo de datos de la versión en Flutter (`Previous work/`) y suma el Coach IA.
 La propuesta y el mockup están en `Documentación/`.
 
+**En vivo:** https://go-gym-blond.vercel.app (botón "Entrar con la cuenta demo" en el login).
+
 ## Requisitos
 
 - PHP 8.3+ y Composer (en Windows: [php.new](https://php.new) instala ambos).
@@ -40,6 +42,40 @@ al día en que se corre el seeder: `php artisan db:seed --class=DemoSeeder` la d
 php artisan test
 ```
 
+## Interfaz
+
+- Mobile-first con barra inferior; en pantallas grandes, barra lateral y columna más ancha.
+- Transiciones entre páginas (View Transitions API), entradas en cascada, números que
+  cuentan, avisos flotantes (toasts) y confeti al guardar o batir un récord. Todo respeta
+  "reducir movimiento".
+- Coach IA sin recargar la página (fetch + JSON), búsqueda en vivo en la biblioteca y
+  pantalla de espera mientras la IA arma una rutina.
+- Registrar entrenamiento: cronómetro de la sesión, serie "hecha" que copia los valores a
+  la siguiente, temporizador de descanso (vibra y suena), y la marca de la última vez como
+  sugerencia en cada serie.
+- Perfil editable (objetivo, nivel, peso, días, horario, contraseña), borrar la cuenta con
+  todos sus datos, mapa de constancia de 12 semanas, volumen semanal y mejores marcas.
+- Páginas de error propias (404, 403, 419, 429, 500, 503) y manifest para instalarla como app.
+
+## Deploy en Vercel
+
+Vercel corre PHP con el runtime comunitario `vercel-php@0.9.0` (PHP 8.5):
+
+- `api/index.php` es la entrada; `public/` se sirve como estático (`vercel.json`).
+- Las cachés de Laravel y las vistas compiladas van a `/tmp` (variables en `vercel.json`).
+- La base de datos es el proyecto de Supabase, en el schema **`gogym`** (no en `public`,
+  que expone la API REST y ya tiene las tablas de Flutter) con el rol `gogym_app`, que solo
+  tiene acceso a ese schema. Conexión por el *Session pooler* (IPv4).
+- En cada deploy, el script `vercel` de `composer.json` crea el schema si falta, migra y
+  corre los seeders (la cuenta demo queda al día).
+- Variables en Vercel: `APP_KEY`, `APP_URL` y `DATABASE_URL` (secretas). Para la IA real,
+  agregar `GROQ_API_KEY` y/o `GEMINI_API_KEY` y volver a desplegar.
+
+```bash
+npm run build
+vercel deploy --prod
+```
+
 ## Estructura
 
 ```
@@ -67,11 +103,12 @@ database/
 ├── data/ejercicios.json            # Catálogo RepDB (601 ejercicios, ya traducido al español)
 └── seeders/                        # EjercicioSeeder, DemoSeeder
 resources/views/
-├── components/                     # app-layout, barra-navegacion, tarjeta, stat-card, aviso, icono…
+├── components/                     # app-layout, barra-navegacion, barra-lateral, tarjeta, aviso (toast), cargando-ia…
+├── errors/                         # 404, 403, 419, 429, 500, 503
 ├── inicio.blade.php
 ├── rutinas/                        # index, show, generar, propuesta, editar (hechas)
 ├── ejercicios/                     # index, show, wger (hechas)
-├── perfil/                         # show (hecha)
+├── perfil/                         # show y editar
 ├── coach/                          # index (hecha)
 ├── entrenamientos/                 # registrar, editar e historial
 └── auth/                           # Breeze, con el diseño de Go Gym

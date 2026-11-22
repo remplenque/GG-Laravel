@@ -67,6 +67,11 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "vercel": [
+            "@php artisan gogym:esquema",
+            "@php artisan migrate --force --no-interaction",
+            "@php artisan db:seed --force --no-interaction"
         ]
     },
     "extra": {

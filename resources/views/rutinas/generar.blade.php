@@ -17,7 +17,7 @@
 --}}
 @php
     // Clases de cada chip; las de peer-checked: lo pintan de azul al marcarlo.
-    $chip = 'flex h-11 cursor-pointer items-center justify-center rounded-xl border border-borde bg-tarjeta px-3 text-sm font-medium text-tenue transition'
+    $chip = 'chip-check flex h-11 cursor-pointer items-center justify-center rounded-xl border border-borde bg-tarjeta px-3 text-sm font-medium text-tenue transition'
         .' hover:text-texto peer-checked:border-primario peer-checked:bg-primario/15 peer-checked:font-semibold peer-checked:text-texto'
         .' peer-focus-visible:ring-2 peer-focus-visible:ring-primario';
 
@@ -36,7 +36,7 @@
 
     {{-- id="form-rutina": el botón de abajo vive fuera del <form> (en el pie
          fijo del layout) y se conecta con el atributo form="form-rutina". --}}
-    <form id="form-rutina" method="POST" action="{{ route('rutinas.proponer') }}" class="mt-5 space-y-5">
+    <form id="form-rutina" method="POST" action="{{ route('rutinas.proponer') }}" class="mt-5 space-y-6" data-ia>
         {{-- @csrf: token que prueba que el formulario salió de esta app. Sin
              él, Laravel rechaza cualquier POST (error 419). --}}
         @csrf
@@ -133,10 +133,18 @@
             </label>
             <textarea id="molestias" name="molestias" rows="3" maxlength="{{ $opciones['max_molestias'] }}"
                       placeholder="Ej.: molestia leve en el hombro derecho"
-                      class="mt-2 w-full rounded-xl border-borde bg-tarjeta text-sm text-texto placeholder:text-tenue focus:border-primario focus:ring-primario">{{ old('molestias') }}</textarea>
+                      class="mt-2 w-full rounded-xl border-borde bg-tarjeta/85 text-sm text-texto placeholder:text-tenue focus:border-primario focus:ring-primario">{{ old('molestias') }}</textarea>
             <x-input-error :messages="$errors->get('molestias')" class="mt-1.5" />
         </div>
     </form>
+
+    {{-- Pantalla de espera mientras la IA arma la propuesta. --}}
+    <x-cargando-ia titulo="Armando tu rutina" :pasos="[
+        'Leyendo tu objetivo y tu nivel…',
+        'Eligiendo ejercicios de la biblioteca…',
+        'Ajustando series, repeticiones y descansos…',
+        'Revisando que todo calce con tu tiempo…',
+    ]" />
 
     {{-- ===================== Botón fijo abajo ===================== --}}
     {{-- form="form-rutina" lo conecta con el formulario de arriba. El evento
@@ -146,7 +154,7 @@
     <x-slot:pie>
         <div x-data="{ enviando: false }" @submit.window="enviando = true">
             <button type="submit" form="form-rutina" x-bind:disabled="enviando"
-                    class="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario disabled:opacity-60">
+                    class="boton-primario boton-ia flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white">
                 <x-icono nombre="chispas" class="size-4" />
                 <span x-text="enviando ? 'Generando…' : 'Generar rutina'">Generar rutina</span>
             </button>

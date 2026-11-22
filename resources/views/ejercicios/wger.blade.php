@@ -33,7 +33,7 @@
         </x-tarjeta>
     @else
         {{-- ===================== 2. Chips por categoría ===================== --}}
-        <nav class="aparecer -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" style="--i: 2" aria-label="Filtrar por categoría">
+        <nav class="aparecer sin-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 lg:-mx-8 lg:px-8" style="--i: 2" aria-label="Filtrar por categoría">
             <a href="{{ route('ejercicios.wger') }}"
                @class([
                    'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium',
@@ -60,7 +60,7 @@
                 <li>
                     {{-- <details>/<summary>: el navegador abre y cierra la
                          descripción solo al tocar el resumen. --}}
-                    <details class="group rounded-2xl border border-borde bg-tarjeta p-3">
+                    <details class="tarjeta group rounded-2xl border border-borde bg-tarjeta/85 p-3 open:border-primario/40">
                         <summary class="flex cursor-pointer list-none items-center gap-3">
                             @if ($ejercicio['imagen'])
                                 <img src="{{ $ejercicio['imagen'] }}" alt="" loading="lazy"

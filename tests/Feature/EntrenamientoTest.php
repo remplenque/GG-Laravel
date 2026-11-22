@@ -143,4 +143,29 @@ class EntrenamientoTest extends TestCase
         $this->actingAs($this->user)->delete(route('entrenamientos.destroy', $ajeno))->assertForbidden();
         $this->assertModelExists($ajeno);
     }
+
+    public function test_el_registro_sugiere_las_marcas_de_la_ultima_vez(): void
+    {
+        $this->actingAs($this->user)->post(route('entrenamientos.store'), $this->datos());
+
+        $this->actingAs($this->user)->get(route('entrenamientos.create', ['rutina' => $this->rutina]))
+            ->assertOk()
+            ->assertSee('Última vez')
+            ->assertSee('placeholder="42.5"', false);
+    }
+
+    public function test_avisa_cuando_se_bate_un_record(): void
+    {
+        $this->actingAs($this->user)->post(route('entrenamientos.store'), $this->datos())
+            ->assertSessionHas('estado', fn (string $mensaje) => str_contains($mensaje, 'Entrenamiento guardado'));
+
+        $this->actingAs($this->user)->post(route('entrenamientos.store'), $this->datos([
+            'ejercicios' => [[
+                'ejercicio_id' => $this->ejercicio->id,
+                'series' => [['kg' => 45, 'reps' => 8, 'rpe' => 9]],
+            ]],
+        ]))
+            ->assertSessionHas('celebrar', true)
+            ->assertSessionHas('estado', fn (string $mensaje) => str_contains($mensaje, 'Nuevo récord en '.$this->ejercicio->nombre));
+    }
 }

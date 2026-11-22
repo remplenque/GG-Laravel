@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\GuardarEntrenamientoRequest;
 use App\Models\Ejercicio;
 use App\Models\Entrenamiento;
+use App\Models\EntrenamientoSerie;
 use App\Models\Rutina;
+use App\Support\Formato;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,11 +35,14 @@ class EntrenamientoController extends Controller
             ? Ejercicio::find($request->string('ejercicio')->toString())
             : null;
 
+        $ejerciciosFormulario = $this->desdeRutina($rutina, $ejercicioLibre);
+
         return view('entrenamientos.create', [
             'rutinas' => $rutinas,
             'rutina' => $rutina,
             'catalogo' => Ejercicio::query()->orderBy('nombre_orden')->get(['id', 'nombre', 'grupo']),
-            'ejerciciosFormulario' => $this->desdeRutina($rutina, $ejercicioLibre),
+            'ejerciciosFormulario' => $ejerciciosFormulario,
+            'marcasPrevias' => $this->ultimasMarcas($request, array_column($ejerciciosFormulario, 'id')),
             'entrenamiento' => null,
         ]);
     }
@@ -48,7 +53,11 @@ class EntrenamientoController extends Controller
         $rutina = $this->rutinaDeLaCuenta($request, $datos['rutina_id'] ?? null);
         $this->validarEjerciciosDeRutina($rutina, $datos['ejercicios']);
 
-        DB::transaction(function () use ($request, $datos, $rutina): void {
+        // Las mejores cargas ANTES de guardar, para detectar récords nuevos.
+        $ids = collect($datos['ejercicios'])->pluck('ejercicio_id')->all();
+        $mejoresAntes = $this->mejoresCargas($request, $ids);
+
+        $entrenamiento = DB::transaction(function () use ($request, $datos, $rutina): Entrenamiento {
             $inicio = CarbonImmutable::parse($datos['inicio'], config('app.timezone'));
             $entrenamiento = $request->user()->entrenamientos()->create([
                 'rutina_id' => $rutina?->id,
@@ -58,10 +67,26 @@ class EntrenamientoController extends Controller
             ]);
 
             $this->guardarSeries($entrenamiento, $datos['ejercicios']);
+
+            return $entrenamiento;
         });
 
+        $entrenamiento->load('series.ejercicio');
+        $records = $this->recordsNuevos($entrenamiento, $mejoresAntes);
+
+        $resumen = collect([
+            $entrenamiento->series->count().' '.($entrenamiento->series->count() === 1 ? 'serie' : 'series'),
+            $entrenamiento->volumen > 0 ? Formato::miles($entrenamiento->volumen).' kg de volumen' : null,
+        ])->filter()->join(' · ');
+
+        $mensaje = $records === []
+            ? "¡Entrenamiento guardado! {$resumen}."
+            : '¡Nuevo récord en '.collect($records)->join(', ', ' y ')."! {$resumen}.";
+
         return redirect()->route('entrenamientos.index')
-            ->with('estado', 'Entrenamiento guardado en tu historial.');
+            ->with('estado', $mensaje)
+            ->with('celebrar', true)
+            ->with('destacar', $entrenamiento->id);
     }
 
     public function edit(Request $request, Entrenamiento $entrenamiento): View
@@ -85,6 +110,11 @@ class EntrenamientoController extends Controller
                         'rpe' => $serie->rpe,
                     ])->values()->all(),
                 ])->values()->all(),
+            'marcasPrevias' => $this->ultimasMarcas(
+                $request,
+                $entrenamiento->series->pluck('ejercicio_id')->unique()->values()->all(),
+                $entrenamiento,
+            ),
             'entrenamiento' => $entrenamiento,
         ]);
     }
@@ -145,6 +175,87 @@ class EntrenamientoController extends Controller
             'grupo' => $libre->grupo,
             'series' => array_fill(0, 3, ['kg' => null, 'reps' => null, 'rpe' => null]),
         ]];
+    }
+
+    /**
+     * La última vez que la cuenta hizo cada ejercicio: la fecha y sus series
+     * en orden. El formulario las muestra como sugerencia (placeholder) en
+     * cada fila, así se ve al tiro qué peso usar.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{fecha: string, series: list<array{kg: ?float, reps: ?int}>}>
+     */
+    private function ultimasMarcas(Request $request, array $ids, ?Entrenamiento $excluir = null): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $series = EntrenamientoSerie::query()
+            ->join('entrenamientos', 'entrenamientos.id', '=', 'entrenamiento_series.entrenamiento_id')
+            ->where('entrenamientos.user_id', $request->user()->id)
+            ->whereIn('entrenamiento_series.ejercicio_id', $ids)
+            ->when($excluir, fn ($consulta) => $consulta->where('entrenamientos.id', '!=', $excluir->id))
+            ->orderByDesc('entrenamientos.inicio')
+            ->orderBy('entrenamiento_series.numero')
+            ->get([
+                'entrenamiento_series.ejercicio_id',
+                'entrenamiento_series.entrenamiento_id',
+                'entrenamiento_series.kg',
+                'entrenamiento_series.reps',
+                'entrenamientos.inicio',
+            ]);
+
+        return $series->groupBy('ejercicio_id')->map(function ($grupo): array {
+            $sesion = $grupo->first()->entrenamiento_id;
+
+            return [
+                'fecha' => Formato::diaRelativo(CarbonImmutable::parse($grupo->first()->inicio), now()),
+                'series' => $grupo->where('entrenamiento_id', $sesion)
+                    ->map(fn ($serie) => ['kg' => $serie->kg, 'reps' => $serie->reps])
+                    ->values()
+                    ->all(),
+            ];
+        })->all();
+    }
+
+    /**
+     * La carga más alta de la cuenta en cada ejercicio, como [id => kg].
+     *
+     * @param  list<string>  $ids
+     * @return array<string, float>
+     */
+    private function mejoresCargas(Request $request, array $ids): array
+    {
+        return EntrenamientoSerie::query()
+            ->whereIn('ejercicio_id', $ids)
+            ->whereNotNull('kg')
+            ->whereHas('entrenamiento', fn ($consulta) => $consulta->where('user_id', $request->user()->id))
+            ->groupBy('ejercicio_id')
+            ->selectRaw('ejercicio_id, MAX(kg) as mejor')
+            ->get()
+            ->mapWithKeys(fn ($fila) => [$fila->ejercicio_id => (float) $fila->mejor])
+            ->all();
+    }
+
+    /**
+     * Nombres de los ejercicios donde esta sesión superó la mejor carga
+     * anterior. La primera vez que se hace un ejercicio no cuenta como
+     * récord (no hay con qué comparar).
+     *
+     * @param  array<string, float>  $mejoresAntes
+     * @return list<string>
+     */
+    private function recordsNuevos(Entrenamiento $entrenamiento, array $mejoresAntes): array
+    {
+        return $entrenamiento->series
+            ->whereNotNull('kg')
+            ->groupBy('ejercicio_id')
+            ->filter(fn ($series, $id) => isset($mejoresAntes[$id]) && $series->max('kg') > $mejoresAntes[$id])
+            ->map(fn ($series) => $series->first()->ejercicio?->nombre)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function guardarSeries(Entrenamiento $entrenamiento, array $ejercicios): void

@@ -180,4 +180,35 @@ class CoachTest extends TestCase
         $this->assertDatabaseCount('agent_conversations', 0);
         $this->assertDatabaseCount('agent_conversation_messages', 0);
     }
+
+    public function test_con_javascript_responde_json_con_el_html_de_los_mensajes(): void
+    {
+        $respuesta = $this->actingAs($this->user)
+            ->postJson(route('coach.preguntar'), ['pregunta' => '¿Cuánto descanso entre series?'])
+            ->assertOk()
+            ->assertJsonStructure(['html']);
+
+        $html = $respuesta->json('html');
+        $this->assertStringContainsString('¿Cuánto descanso entre series?', $html);
+        $this->assertStringContainsString('<strong>2 a 3 minutos</strong>', $html);
+        $this->assertCount(2, session('coach.mensajes'));
+    }
+
+    public function test_con_javascript_valida_y_avisa_si_la_ia_falla(): void
+    {
+        $this->actingAs($this->user)
+            ->postJson(route('coach.preguntar'), ['pregunta' => ''])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pregunta');
+
+        $this->mock(Coach::class, function ($mock) {
+            $mock->shouldReceive('ejercicioMencionado')->andReturn(null);
+            $mock->shouldReceive('responder')->andThrow(new RuntimeException('Cuota agotada'));
+        });
+
+        $this->actingAs($this->user)
+            ->postJson(route('coach.preguntar'), ['pregunta' => 'Hola'])
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'El coach no pudo responder ahora. Espera un momento y vuelve a intentarlo.');
+    }
 }

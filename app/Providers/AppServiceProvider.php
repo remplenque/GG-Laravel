@@ -7,6 +7,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // En producción todo va por HTTPS (enlaces, assets y formularios).
+        if ($this->app->isProduction()) {
+            URL::forceScheme('https');
+        }
+
         // Fechas en el idioma de la app ("Lunes 9 de noviembre").
         Carbon::setLocale(config('app.locale'));
         CarbonImmutable::setLocale(config('app.locale'));

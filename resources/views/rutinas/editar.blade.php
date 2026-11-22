@@ -109,7 +109,7 @@
     {{-- ===================== Botón fijo abajo ===================== --}}
     <x-slot:pie>
         <button type="submit" form="form-editar"
-                class="flex h-12 w-full items-center justify-center rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario">
+                class="boton-primario flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white">
             Guardar cambios
         </button>
     </x-slot:pie>

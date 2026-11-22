@@ -111,6 +111,9 @@ return [
     'demo' => [
         'email' => env('GOGYM_DEMO_EMAIL', 'demo@gogym.app'),
         'password' => env('GOGYM_DEMO_PASSWORD', 'demo2026'),
+        // Muestra el botón "Entrar con la cuenta demo" en el login (útil
+        // para la presentación). Ponlo en false para ocultarlo.
+        'boton' => (bool) env('GOGYM_DEMO_BOTON', true),
     ],
 
 ];

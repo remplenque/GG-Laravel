@@ -26,7 +26,7 @@
                 {{ $rutinas->count() }} {{ $rutinas->count() === 1 ? 'rutina' : 'rutinas' }} · rotan en orden
             @endif
         </p>
-        <h1 class="font-display text-2xl font-bold">Rutinas</h1>
+        <h1 class="font-display text-2xl font-bold lg:text-3xl">Rutinas</h1>
     </header>
 
     {{-- "Guardamos 4 rutinas…" o "Borramos Push A." (RutinaController). --}}
@@ -45,7 +45,7 @@
                 <p class="mt-0.5 text-xs text-tenue">Según tu objetivo, tu nivel y tu tiempo.</p>
             </div>
             <a href="{{ route('rutinas.generar') }}"
-               class="shrink-0 rounded-[10px] bg-primario-fuerte px-3.5 py-2 text-xs font-semibold text-white hover:bg-primario">
+               class="boton-primario boton-ia shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold text-white">
                 Generar
             </a>
         </x-tarjeta>
@@ -122,12 +122,12 @@
         {{-- Estado vacío: una lista vacía no es un error, pero hay que
              explicar qué hacer en vez de dejar la pantalla en blanco. --}}
         <div class="aparecer mt-14 flex flex-col items-center px-4 text-center" style="--i: 1">
-            <span class="grid size-[72px] place-items-center rounded-full bg-ia/15 text-ia">
+            <span class="orbe-ia grid size-[72px] place-items-center rounded-full text-white animate-flotar">
                 <x-icono nombre="chispas" class="size-8" />
             </span>
             <p class="mt-4 font-bold">Aún no tienes rutinas</p>
             <p class="mt-1.5 text-sm text-tenue">El Coach IA te arma una según tu objetivo, tu nivel y el tiempo que tienes.</p>
-            <a href="{{ route('rutinas.generar') }}" class="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-primario-fuerte px-4 py-2.5 text-sm font-semibold text-white hover:bg-primario">
+            <a href="{{ route('rutinas.generar') }}" class="boton-primario boton-ia mt-5 inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-white">
                 <x-icono nombre="chispas" class="size-4" /> Arma tu rutina con IA
             </a>
         </div>

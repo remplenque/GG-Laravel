@@ -53,4 +53,15 @@ class Ejercicio extends Model
             ? null
             : config('gogym.imagenes_url').$this->imagen);
     }
+
+    /**
+     * URL de la foto del final del movimiento (la ficha alterna las dos para
+     * mostrar el gesto completo), o null si no tiene.
+     */
+    protected function urlImagenFinal(): Attribute
+    {
+        return Attribute::get(fn () => empty($this->imagen_final)
+            ? null
+            : config('gogym.imagenes_url').$this->imagen_final);
+    }
 }

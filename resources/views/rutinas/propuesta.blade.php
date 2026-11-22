@@ -21,7 +21,7 @@
         <div class="aparecer flex items-center gap-3" style="--i: 0">
             {{-- Vuelve al formulario: la propuesta sigue en la sesión hasta guardarla. --}}
             <a href="{{ route('rutinas.generar') }}"
-               class="grid size-10 shrink-0 place-items-center rounded-xl border border-borde bg-tarjeta text-texto hover:border-primario/60"
+               class="presionable grid size-10 shrink-0 place-items-center rounded-xl border border-borde bg-tarjeta text-texto transition hover:border-primario/60"
                aria-label="Volver al formulario">
                 <x-icono nombre="flecha-izq" />
             </a>
@@ -32,7 +32,7 @@
 
         {{-- ===================== 2. Título y resumen ===================== --}}
         <div class="aparecer" style="--i: 1">
-            <h1 class="mt-4 font-display text-2xl font-bold leading-tight">
+            <h1 class="mt-4 font-display text-2xl font-bold leading-tight lg:text-3xl">
                 {{ $propuesta['nombre'] }} · {{ count($propuesta['dias']) }} días
             </h1>
             <p class="mt-1 text-xs text-tenue">
@@ -41,12 +41,12 @@
         </div>
 
         {{-- ===================== 3. Pestañas por día ===================== --}}
-        <div class="aparecer -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1" style="--i: 2"
+        <div class="aparecer sin-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:-mx-8 lg:px-8" style="--i: 2"
              role="tablist" aria-label="Días de la rutina">
             @foreach ($propuesta['dias'] as $i => $dia)
                 <button type="button" role="tab" @click="dia = {{ $i }}"
                         :aria-selected="dia === {{ $i }}"
-                        :class="dia === {{ $i }} ? 'border-primario-fuerte bg-primario-fuerte text-white' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
+                        :class="dia === {{ $i }} ? 'border-primario-fuerte bg-primario-fuerte text-white shadow-[0_6px_18px_-8px_rgb(47_107_255)]' : 'border-borde bg-tarjeta text-tenue hover:text-texto'"
                         class="shrink-0 whitespace-nowrap rounded-[10px] border px-4 py-2 text-xs font-semibold transition">
                     {{ $dia['nombre'] }}
                 </button>
@@ -59,7 +59,8 @@
              todas por un instante). --}}
         <div class="aparecer mt-4" style="--i: 3">
             @foreach ($propuesta['dias'] as $i => $dia)
-                <ol class="space-y-2" x-show="dia === {{ $i }}" @if ($i > 0) x-cloak @endif>
+                <ol class="space-y-2" x-show="dia === {{ $i }}" @if ($i > 0) x-cloak @endif
+                    x-transition:enter="transition duration-300 ease-out" x-transition:enter-start="opacity-0 translate-x-3" x-transition:enter-end="opacity-100 translate-x-0">
                     @foreach ($dia['ejercicios'] as $n => $item)
                         {{-- Si el ejercicio no estuviera en el catálogo se
                              muestra el id; validar() ya lo impide, es solo por si acaso. --}}
@@ -91,6 +92,12 @@
     </div>
 
     {{-- ===================== 6. Botones fijos abajo ===================== --}}
+    <x-cargando-ia titulo="Buscando otra propuesta" :pasos="[
+        'Mismas preferencias, otra combinación…',
+        'Eligiendo ejercicios de la biblioteca…',
+        'Revisando series y descansos…',
+    ]" />
+
     {{-- Cada botón es su propio <form> POST con @csrf. Regenerar vuelve a
          pedir una propuesta con las mismas preferencias; Guardar la pasa a
          "Mis rutinas". La casilla está fuera del <form> de Guardar (va arriba,
@@ -105,11 +112,11 @@
         {{-- "enviando" guarda qué botón se apretó (null = ninguno): desactiva los
              dos para no mandar dos veces, y solo Regenerar cambia su texto. --}}
         <div class="grid grid-cols-[auto_1fr] gap-2" x-data="{ enviando: null }">
-            <form method="POST" action="{{ route('rutinas.regenerar') }}" @submit="enviando = 'regenerar'">
+            <form method="POST" action="{{ route('rutinas.regenerar') }}" @submit="enviando = 'regenerar'" data-ia>
                 @csrf
                 <button type="submit" x-bind:disabled="enviando"
-                        class="flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-borde bg-tarjeta px-4 text-sm font-semibold text-texto hover:bg-white/5 disabled:opacity-60">
-                    <x-icono nombre="rayo" class="size-4" />
+                        class="presionable flex h-12 items-center justify-center gap-1.5 rounded-2xl border border-borde bg-tarjeta px-4 text-sm font-semibold text-texto transition hover:border-ia/60 hover:bg-white/5 disabled:opacity-60">
+                    <x-icono nombre="refrescar" class="size-4" />
                     <span x-text="enviando === 'regenerar' ? 'Generando…' : 'Regenerar'">Regenerar</span>
                 </button>
             </form>
@@ -117,8 +124,8 @@
             <form id="form-guardar" method="POST" action="{{ route('rutinas.guardar') }}" @submit="enviando = 'guardar'">
                 @csrf
                 <button type="submit" x-bind:disabled="enviando"
-                        class="flex h-12 w-full items-center justify-center rounded-2xl bg-primario-fuerte text-sm font-bold text-white hover:bg-primario disabled:opacity-60">
-                    Guardar en mis rutinas
+                        class="boton-primario flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white">
+                    <x-icono nombre="check" class="size-4" /> Guardar en mis rutinas
                 </button>
             </form>
         </div>

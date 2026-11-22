@@ -56,4 +56,36 @@ class InicioTest extends TestCase
 
         SugerenciaAgent::assertPromptedTimes(1);
     }
+
+    public function test_la_sugerencia_del_dia_se_guarda_en_cache(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::where('email', config('gogym.demo.email'))->firstOrFail();
+        config(['ai.providers.groq.key' => 'clave-de-prueba']);
+        SugerenciaAgent::fake(['Sube 2,5 kg en el press de banca.']);
+
+        $this->actingAs($user)->get('/')->assertSee('Sube 2,5 kg en el press de banca.');
+        $this->actingAs($user)->get('/')->assertSee('Sube 2,5 kg en el press de banca.');
+
+        SugerenciaAgent::assertPromptedTimes(1);
+    }
+
+    public function test_cuenta_sin_datos_ve_el_llamado_a_completar_el_perfil(): void
+    {
+        $user = User::factory()->create(['name' => 'Ana']);
+
+        $this->actingAs($user)->get('/')
+            ->assertOk()
+            ->assertSee('Completa tu perfil')
+            ->assertSee('Meta semanal');
+    }
+
+    public function test_las_paginas_de_error_usan_el_diseno_de_la_app(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/rutinas/999999')
+            ->assertNotFound()
+            ->assertSee('No encontramos esta página');
+    }
 }

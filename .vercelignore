@@ -1,0 +1,24 @@
+# Lo que no se sube a Vercel. vendor/ y node_modules/ se instalan allá.
+/vendor
+/node_modules
+/.git
+/.claude
+/.env
+/.env.*
+!/.env.example
+/.phpunit.result.cache
+/.phpunit.cache
+/tests
+/Documentación
+/database/*.sqlite*
+/storage/logs/*
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/bootstrap/cache/*.php
+# public/index.php y .htaccess son para servidores tradicionales: en Vercel
+# la entrada es api/index.php y public/ se sirve como archivos estáticos.
+/public/index.php
+/public/.htaccess
+/public/hot
+/.mcp.json

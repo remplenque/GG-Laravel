@@ -47,12 +47,21 @@
     {{-- ===================== 2. Imagen ===================== --}}
     {{-- url_imagen es un accessor del modelo (Ejercicio::urlImagen): arma la
          URL de jsDelivr con el nombre del archivo, o devuelve null. --}}
-    <div class="aparecer mt-4 overflow-hidden rounded-2xl border border-borde bg-tarjeta" style="--i: 1">
+    {{-- Si hay foto del final del movimiento, las dos se alternan solas
+         (animación "foto-movimiento" en app.css) para mostrar el gesto. --}}
+    <div class="aparecer relative mt-4 overflow-hidden rounded-2xl border border-borde bg-white shadow-[0_20px_50px_-30px_rgb(76_141_255/0.6)]" style="--i: 1">
         @if ($ejercicio->url_imagen)
             <img src="{{ $ejercicio->url_imagen }}" alt="{{ $ejercicio->nombre }}"
-                 class="aspect-video w-full bg-white object-contain" loading="lazy">
+                 class="aspect-video w-full bg-white object-contain" loading="lazy" decoding="async">
+            @if ($ejercicio->url_imagen_final)
+                <img src="{{ $ejercicio->url_imagen_final }}" alt="" aria-hidden="true"
+                     class="foto-movimiento absolute inset-0 aspect-video w-full bg-white object-contain" loading="lazy" decoding="async">
+                <span class="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-fondo/80 px-2 py-1 text-[10px] font-semibold text-texto backdrop-blur">
+                    <x-icono nombre="play" class="size-2.5 text-primario" /> Movimiento completo
+                </span>
+            @endif
         @else
-            <div class="grid aspect-video place-items-center text-tenue">
+            <div class="grid aspect-video place-items-center bg-tarjeta text-tenue">
                 <x-icono nombre="imagen" class="size-8" />
             </div>
         @endif
@@ -60,7 +69,7 @@
 
     {{-- ===================== 3. Nombre y chips ===================== --}}
     <section class="aparecer mt-4" style="--i: 2">
-        <h1 class="font-display text-2xl font-bold leading-tight">{{ $ejercicio->nombre }}</h1>
+        <h1 class="font-display text-2xl font-bold leading-tight lg:text-3xl">{{ $ejercicio->nombre }}</h1>
         <p class="mt-0.5 text-xs text-tenue">{{ $ejercicio->grupo }} · {{ $ejercicio->nivel }}</p>
 
         {{-- musculos es un arreglo (cast 'array' en el modelo). Los
@@ -94,8 +103,8 @@
     {{-- ===================== 5. Marcas del usuario ===================== --}}
     {{-- Dos <x-stat-card> lado a lado, como en el mockup. --}}
     <div class="aparecer mt-5 grid grid-cols-2 gap-2" style="--i: 4">
-        <x-stat-card :valor="$marca($ultimaVez)" etiqueta="Última vez" />
-        <x-stat-card :valor="$marca($mejorMarca)" etiqueta="Mejor marca" />
+        <x-stat-card :valor="$marca($ultimaVez)" etiqueta="Última vez" icono="reloj" />
+        <x-stat-card :valor="$marca($mejorMarca)" etiqueta="Mejor marca" icono="trofeo" />
     </div>
 
     {{-- ===================== 6. Consejos ===================== --}}
@@ -121,13 +130,19 @@
         <div class="mt-3 flex flex-col items-start gap-2">
             @foreach ($preguntas as $pregunta)
                 <a href="{{ route('coach', ['pregunta' => $pregunta]) }}"
-                   class="rounded-full border border-ia-borde px-3 py-1.5 text-xs font-medium text-texto hover:bg-white/5">
+                   class="presionable inline-flex items-center gap-1.5 rounded-full border border-ia-borde px-3 py-1.5 text-xs font-medium text-texto transition hover:border-ia/60 hover:bg-white/5">
                     {{ $pregunta }}
                 </a>
             @endforeach
         </div>
         <p class="mt-3 text-[11px] text-tenue">Orientación general. Ante dolor o lesión, consulta a un profesional.</p>
     </x-tarjeta>
+
+    {{-- Registrar este ejercicio suelto (abre la vista 05 con él cargado). --}}
+    <a href="{{ route('entrenamientos.create', ['ejercicio' => $ejercicio->id]) }}"
+       class="aparecer presionable mt-3 flex items-center justify-center gap-2 rounded-2xl border border-borde bg-tarjeta/85 py-3 text-sm font-semibold transition hover:border-primario/60" style="--i: 7">
+        <x-icono nombre="pesa" class="size-4 text-primario" /> Registrar este ejercicio
+    </a>
 
     {{-- ===================== 8. Agregar a una rutina ===================== --}}
     {{-- Elige una de sus rutinas en el <select> y la manda por POST a
@@ -146,7 +161,7 @@
                     @endforeach
                 </select>
                 <button type="submit"
-                        class="shrink-0 rounded-xl bg-primario-fuerte px-4 text-sm font-semibold text-white hover:bg-primario">
+                        class="boton-primario shrink-0 rounded-xl px-4 text-sm font-semibold text-white">
                     Agregar
                 </button>
             </form>
